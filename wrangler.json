@@ -1,0 +1,16 @@
+{
+  "compatibility_date": "2025-04-01",
+  "main": "src/index.ts",
+  "name": "eee4464",
+  "upload_source_maps": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_id": "2cfc7ad1-2cad-4056-8b34-ed4edc1d463d",
+      "database_name": "divine-rain-83c6-d1"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}
