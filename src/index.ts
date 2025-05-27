@@ -1,4 +1,5 @@
 import { renderHtml } from './resp.js';
+
 var __defProp = Object.defineProperty;
 var __name = (target: (content: any) => string, value: string) => __defProp(target, "name", { value, configurable: true });
 
@@ -16,7 +17,7 @@ var index_default = {
     if (pathname.startsWith('/api/sensors')) return handleSensors(request, db, searchParams);
     if (pathname.startsWith('/api/sensor_data')) return handleSensorData(request, db, searchParams);
     if (pathname.startsWith('/api/controls')) return handleControls(request, db, searchParams);
-
+    if (pathname.startsWith('/api/messages')) return handleMessages(request, db, searchParams);
 
     // return new Response('Not Found', { status: 404 });
 
@@ -270,6 +271,39 @@ async function handleControls(request, db, searchParams) {
     const del = await db.prepare('DELETE FROM controls WHERE control_id = ?').bind(control_id).run();
     return json({ deleted: del.changes });
   }
+}
+
+// @ts-ignore
+async function handleMessages(request, db, searchParams) {
+  if (request.method === 'GET') {
+    // pull messages after a certain timestamp, default 10
+    const after = Number(searchParams.get('after')) || 0;
+    const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 20);
+
+    const res = await db.prepare(
+        'SELECT * FROM message WHERE created_at > ? ORDER BY created_at ASC LIMIT ?'
+    ).bind(after, limit).all();
+
+    return json(res.results);
+  }
+
+  if (request.method === 'POST') {
+    // write a message
+    const body = await request.json();
+    const { control_id, state, device_id, from_source } = body;
+    if (!control_id || !state || !device_id || !from_source) {
+      return text('Missing fields', 400);
+    }
+    const created_at = Math.floor(Date.now() / 1000); // current timestamp
+    const insert = await db.prepare(`
+      INSERT INTO message (control_id, state, device_id, from_source, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).bind(control_id, state, device_id, from_source, created_at).run();
+
+    return json({ message_id: insert.meta.last_row_id });
+  }
+
+  return text('Method Not Allowed', 405);
 }
 // @ts-ignore
 function json(obj) {

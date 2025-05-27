@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
     "target": "esnext",
-    "lib": ["esnext"],
+    "lib": [
+      "esnext",
+      "dom"
+    ],
     "module": "esnext",
     "moduleResolution": "bundler",
     "types": ["./worker-configuration.d.ts"],
@@ -11,5 +14,5 @@
     "skipLibCheck": true,
     "strict": true
   },
-  "include": ["src"]
+  "include": ["src","src/**/*.ts","src/env.d.ts","site"],
 }
