@@ -6,11 +6,12 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_id": "2cfc7ad1-2cad-4056-8b34-ed4edc1d463d",
-      "database_name": "divine-rain-83c6-d1"
+      "database_id": "1e211eda-b466-443f-8a46-f0815046ecf0",
+      "database_name": "eee4464"
     }
   ],
   "observability": {
     "enabled": true
   }
+
 }
