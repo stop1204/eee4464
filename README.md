@@ -57,3 +57,16 @@ A live public deployment of this template is available at [https://d1-template.t
    ```bash
    npx wrangler deploy
    ```
+## Local Development
+To run this project locally, you can use the `wrangler dev` command:
+
+```bash
+npx wrangler dev
+```
+or
+```bash
+wrangler dev --remote
+```
+This will start a local server that simulates the Worker environment, allowing you to test your Worker and D1 database interactions.
+## License
+This project is licensed under the [MIT License](lICENSE).
