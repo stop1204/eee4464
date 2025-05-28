@@ -339,7 +339,6 @@
                     Array.from(sensorSelect.options).forEach(opt => {
                         opt.selected = ids.includes(opt.value);
                     })
-                    console.log('批量选中后:', Array.from(sensorSelect.selectedOptions).map(o => o.value));
                     sensorSelect.dispatchEvent(new Event('change', {bubbles: true}));
                 },0);
             } else {
@@ -568,7 +567,7 @@
               <button class="closeBtn" data-id="${w.control_id}">×</button>
               <h4>${w.control_name || w.control_type}</h4>
               <p>Staus: <strong>${w.state || 'unknown'}</strong></p>
-              <button class="toggleBtn">${w.state === 'on' ? 'Close' : 'Open'}</button>
+              <button class="toggleBtn">${w.state === 'on' ? 'OFF' : 'ON'}</button>
             `;
             // delete button
             div.querySelector('.closeBtn').onclick = () => {

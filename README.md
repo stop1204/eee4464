@@ -1,3 +1,9 @@
+# TODO
+1. Data trending, top/bottom comments, etc.
+2. Data analysis, e.g. sentiment analysis on comments.
+3. API endpoints to interact with the D1 database.
+4. API endpoints to interact with the ESP32.
+
 # Worker + D1 Database
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/templates/tree/main/d1-template)
