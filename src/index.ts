@@ -11,7 +11,7 @@ var index_default = {
   async fetch(request: { url: string | URL; }, env: { DB: any; }) {
     const url = new URL(request.url);
     const { pathname, searchParams } = url;
-    const db = env.DB; // 你的 D1 绑定名，确保已绑定
+    const db = env.DB;
 
     if (pathname.startsWith('/api/device')) return handleDevice(request, db, searchParams);
     if (pathname.startsWith('/api/sensors')) return handleSensors(request, db, searchParams);
@@ -19,17 +19,8 @@ var index_default = {
     if (pathname.startsWith('/api/controls')) return handleControls(request, db, searchParams);
     if (pathname.startsWith('/api/messages')) return handleMessages(request, db, searchParams);
 
-    // return new Response('Not Found', { status: 404 });
-
-
-
-    const stmt = db.prepare("SELECT * FROM sensor_data LIMIT 3");
-    const { results } = await stmt.all();
-    return new Response( renderHtml(JSON.stringify(results, null, 2)), {
-      headers: {
-        "content-type": "text/html"
-      }
-    });
+    // If no API route matched, and Wrangler didn't find a static file, return 404.
+    return new Response('Not Found', { status: 404 });
   }
 };
 export {
