@@ -34,9 +34,10 @@ export {
 // @ts-ignore
 async function handleDevice(request, db, searchParams) {
   if (request.method === 'GET') {
-    // 支持分页和筛选 device_name、device_type
+    // allow filter by device_name, device_type, device_id
     const device_name = searchParams.get('device_name');
     const device_type = searchParams.get('device_type');
+    const device_id = searchParams.get('device_id');
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
     const offset = parseInt(searchParams.get('offset') || '0');
 
@@ -51,6 +52,10 @@ async function handleDevice(request, db, searchParams) {
       query += ' AND device_type = ?';
       params.push(device_type);
     }
+    if (device_id) {
+      query += ' AND device_id = ?';
+      params.push(device_id);
+    }
     query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
     params.push(limit, offset);
 
@@ -60,18 +65,25 @@ async function handleDevice(request, db, searchParams) {
 
   if (request.method === 'POST') {
     // 新增设备
-    const { device_name, device_type } = await request.json();
+    const { device_id, device_name, device_type } = await request.json();
     if (!device_name) return new Response('Missing device_name', { status: 400 });
 
-    const insert = await db.prepare(
-      'INSERT INTO device (device_name, device_type, created_at) VALUES (?, ?, strftime("%s","now"))'
-    ).bind(device_name, device_type).run();
-    console.log('Insert result:');
+    let insert;
+    if (device_id !== undefined && device_id !== null) {
+      insert = await db.prepare(
+        'INSERT INTO device (device_id, device_name, device_type, created_at) VALUES (?, ?, ?, strftime("%s","now"))'
+      ).bind(device_id, device_name, device_type).run();
+    } else {
+      insert = await db.prepare(
+        'INSERT INTO device (device_name, device_type, created_at) VALUES (?, ?, strftime("%s","now"))'
+      ).bind(device_name, device_type).run();
+    }
     return new Response(JSON.stringify({ insertedId: insert.meta.last_row_id }), { headers: { 'Content-Type': 'application/json' } });
   }
 
   if (request.method === 'PUT') {
-    // 更新设备，需通过 ?device_id=xxx 指定ID
+
+    // update device, need to specify device_id in query params (?device_id=xxx)
     const device_id = searchParams.get('device_id');
     if (!device_id) return new Response('Missing device_id', { status: 400 });
 
@@ -85,7 +97,7 @@ async function handleDevice(request, db, searchParams) {
   }
 
   if (request.method === 'DELETE') {
-    // 删除设备，需通过 ?device_id=xxx 指定ID
+    // delete device, need to specify device_id in query params (?device_id=xxx)
     const device_id = searchParams.get('device_id');
     if (!device_id) return new Response('Missing device_id', { status: 400 });
 
@@ -100,7 +112,7 @@ async function handleDevice(request, db, searchParams) {
 // @ts-ignore
 async function handleSensors(request, db, searchParams) {
   if (request.method === 'GET') {
-    // 支持分页和筛选 device_id, sensor_type
+    // allow filter by device_id, sensor_type
     const device_id = searchParams.get('device_id');
     const sensor_type = searchParams.get('sensor_type');
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
@@ -163,7 +175,7 @@ async function handleSensors(request, db, searchParams) {
 // @ts-ignore
 async function handleSensorData(request, db, searchParams) {
   if (request.method === 'GET') {
-    // 支持分页、时间区间和传感器筛选
+    // allow filter by sensor_id, start, end, limit, offset
     const sensor_id = searchParams.get('sensor_id');
     const start = searchParams.get('start'); // UNIX时间戳
     const end = searchParams.get('end');
@@ -192,7 +204,7 @@ async function handleSensorData(request, db, searchParams) {
 
   if (request.method === 'POST') {
     /*
-      传感器数据上传示例格式：
+      upload example：
       {
         sensor_id: 123,
         timestamp: 1684555200,
@@ -212,7 +224,7 @@ async function handleSensorData(request, db, searchParams) {
     return json({ data_id: insert.meta.last_row_id });
   }
 
-  // PUT和DELETE可视需求实现，一般上传数据多用POST，查询用GET
+  // put and delete methods can be implemented as needed, generally POST is used for uploading data, and GET is used for querying
 }
 // @ts-ignore
 async function handleControls(request, db, searchParams) {
@@ -226,7 +238,7 @@ async function handleControls(request, db, searchParams) {
 
   if (request.method === 'POST') {
     /*
-      控制命令格式示例：
+      example：
       {
         device_id: 1,
         control_type: "button",
