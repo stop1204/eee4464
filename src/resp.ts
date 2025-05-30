@@ -1,5 +1,5 @@
 import indexHtml from "../site/index.html";
 
-export function renderHtml(s: string) {
+export function renderHtml() {
   return indexHtml;
 }

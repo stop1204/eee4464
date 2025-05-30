@@ -19,8 +19,12 @@ var index_default = {
     if (pathname.startsWith('/api/controls')) return handleControls(request, db, searchParams);
     if (pathname.startsWith('/api/messages')) return handleMessages(request, db, searchParams);
 
-    // If no API route matched, and Wrangler didn't find a static file, return 404.
-    return new Response('Not Found', { status: 404 });
+
+    return new Response( renderHtml(), {
+      headers: {
+        "content-type": "text/html"
+      }
+    });
   }
 };
 export {
