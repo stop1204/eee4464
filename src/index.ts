@@ -64,7 +64,7 @@ async function handleDevice(request, db, searchParams) {
   }
 
   if (request.method === 'POST') {
-    // 新增设备
+    // new device
     const { device_id, device_name, device_type } = await request.json();
     if (!device_name) return new Response('Missing device_name', { status: 400 });
 
@@ -137,13 +137,22 @@ async function handleSensors(request, db, searchParams) {
   }
 
   if (request.method === 'POST') {
-    const { device_id, sensor_type, sensor_name } = await request.json();
+    const { sensor_id,device_id, sensor_type, sensor_name } = await request.json();
     if (!device_id || !sensor_type) return text('Missing device_id or sensor_type', 400);
 
-    const insert = await db.prepare(`
-      INSERT INTO sensors (device_id, sensor_type, sensor_name, created_at)
-      VALUES (?, ?, ?, strftime('%s','now'))
-    `).bind(device_id, sensor_type, sensor_name).run();
+    let insert;
+    if (sensor_id !== undefined && sensor_id !== null) {
+      insert = await db.prepare(`
+        INSERT INTO sensors (sensor_id, device_id, sensor_type, sensor_name, created_at)
+        VALUES (?, ?, ?, ?, strftime('%s','now'))
+      `).bind(sensor_id, device_id, sensor_type, sensor_name).run();
+    } else {
+      // if sensor_id is not provided, it will be auto-incremented
+      insert = await db.prepare(`
+        INSERT INTO sensors (device_id, sensor_type, sensor_name, created_at)
+        VALUES (?, ?, ?, strftime('%s','now'))
+      `).bind(device_id, sensor_type, sensor_name).run();
+    }
 
     return json({ sensor_id: insert.meta.last_row_id });
   }
