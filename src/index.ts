@@ -223,12 +223,23 @@ async function handleSensorData(request, db, searchParams) {
     const body = await request.json();
     const { sensor_id, timestamp, data } = body;
 
-    if (!sensor_id || !timestamp || !data) return text('Missing sensor_id or timestamp or data', 400);
+    if (!sensor_id || !data) return text('Missing sensor_id or timestamp or data', 400);
 
-    const insert = await db.prepare(`
-      INSERT INTO sensor_data (sensor_id, timestamp, data)
-      VALUES (?, ?, ?)
-    `).bind(sensor_id, timestamp, JSON.stringify(data)).run();
+    // if timestamp is not provided use current time
+
+    let insert;
+    if (!timestamp) {
+
+      insert = await db.prepare(`
+        INSERT INTO sensor_data (sensor_id, data, timestamp)
+        VALUES (?,?,strftime('%s','now')
+        )`).bind(sensor_id, JSON.stringify(data)).run();
+    }else{
+      insert = await db.prepare(`
+        INSERT INTO sensor_data (sensor_id, timestamp, data)
+        VALUES (?, ?, ?)
+      `).bind(sensor_id, timestamp, JSON.stringify(data)).run();
+    }
 
     return json({ data_id: insert.meta.last_row_id });
   }
