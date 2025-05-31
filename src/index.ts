@@ -272,7 +272,7 @@ async function handleControls(request, db, searchParams) {
     const insert = await db.prepare(`
       INSERT INTO controls (device_id, control_type, control_name, state, updated_at,control_id)
       VALUES (?, ?, ?, ?, strftime('%s','now'),?)
-    `).bind(device_id, control_type, control_name, state).run();
+    `).bind(device_id, control_type, control_name, state,control_id).run();
 
     return json({ control_id: insert.meta.last_row_id });
   }
