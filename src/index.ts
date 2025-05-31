@@ -266,12 +266,12 @@ async function handleControls(request, db, searchParams) {
         state: "on"
       }
     */
-    const { device_id, control_type, control_name, state } = await request.json();
-    if (!device_id || !control_type) return text('Missing device_id or control_type', 400);
+    const { device_id, control_id , control_type, control_name, state } = await request.json();
+    if (!device_id || !control_id || !control_type) return text('Missing device_id or control_type', 400);
 
     const insert = await db.prepare(`
-      INSERT INTO controls (device_id, control_type, control_name, state, updated_at)
-      VALUES (?, ?, ?, ?, strftime('%s','now'))
+      INSERT INTO controls (device_id, control_type, control_name, state, updated_at,control_id)
+      VALUES (?, ?, ?, ?, strftime('%s','now'),?)
     `).bind(device_id, control_type, control_name, state).run();
 
     return json({ control_id: insert.meta.last_row_id });
