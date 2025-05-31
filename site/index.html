@@ -699,13 +699,18 @@
 
         addWidgetBtn.addEventListener('click', async () => {
             // simple prompt for control_name and control_type
+            if (!selectedDeviceId) {
+                return alert('Please select a device sensor first');
+            }
+            const sensor_id = sensorSelect.value;
             const name = prompt('Please enter widget name');
             const type = prompt('Please enter type (button/slider/switch)');
             if (!name || !type) return alert('name and type cannot be empty');
             const resp = await fetch('/api/controls', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({device_id: selectedDeviceId, control_name: name, control_type: type, state: 'off'})
+                body: JSON.stringify({control_id:sensor_id,device_id: selectedDeviceId, control_name: name, control_type: type,
+                    state: 'off'})
             });
             if (resp.ok) {
                 await loadWidgets();
