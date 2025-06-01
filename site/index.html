@@ -828,7 +828,7 @@
             // saveSettingsToLocal();
             // no need to fetch data again, just re-render chart with cached data
             const datasets = chartDataCache.map((d,i) => ({
-                label: d.labelKey + ' (ID:' + d.sensorId + ')',
+                label: `${d.field} (Sensor:${d.sensorId})`, // FIX: use correct label
                 data: d.points,
                 borderColor: getLineColor(`${d.field}-${d.sensorId}`, i),
                 backgroundColor: 'transparent',
