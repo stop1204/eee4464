@@ -228,17 +228,30 @@ async function handleSensorData(request, db, searchParams) {
     // if timestamp is not provided use current time
 
     let insert;
+    let data_json;
+    // data from esp32: "{\"moisture\":\"2928\"}", need to parse it
+    // replace '"{' and '}"' with '{' and '}'
+    // replace '\"' with '"'
+    if (typeof data === 'string') {
+      try {
+        data_json = JSON.parse(data.replace(/\"{/g, '{').replace(/}\"/g, '}').replace(/\\"/g, '"'));
+      } catch (e) {
+        return text('Invalid data format', 400);
+      }
+    }
+    if (typeof data === 'object') {
+      data_json = data;
+    }
     if (!timestamp) {
-
       insert = await db.prepare(`
         INSERT INTO sensor_data (sensor_id, data, timestamp)
         VALUES (?,?,strftime('%s','now')
-        )`).bind(sensor_id, JSON.stringify(data)).run();
+        )`).bind(sensor_id, JSON.stringify(data_json)).run();
     }else{
       insert = await db.prepare(`
         INSERT INTO sensor_data (sensor_id, timestamp, data)
         VALUES (?, ?, ?)
-      `).bind(sensor_id, timestamp, JSON.stringify(data)).run();
+      `).bind(sensor_id, timestamp, JSON.stringify(data_json)).run();
     }
 
     return json({ data_id: insert.meta.last_row_id });
