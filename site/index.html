@@ -480,10 +480,11 @@
 
     // --- render Chart.js chart ---
     function renderChart(datasets) {
-        // if (currentChart) {
-        //   currentChart.destroy();
-        //   currentChart = null;
-        // }
+        // destory chart
+        if (currentChart) {
+            currentChart.destroy();
+            currentChart = null;
+        }
         const timeUnitMap = {
             hour: 'minute',
             day: 'hour',
@@ -492,81 +493,224 @@
             year: 'month'
         };
 
-        // only one dataset for pie/doughnut chart
-        if (selectedChartType === 'pie' || selectedChartType === 'doughnut') {
-            // get all datasets with same sensorId, or merge all points
+        // calculate fit line data
+        let fitLines = [];
+        datasets.forEach((ds, i) => {
+            if (ds.data.length > 1) {
+                const {k, b} = linearFit(ds.data);
+                // get x range
+                const x0 = ds.data[0].x;
+                const x1 = ds.data[ds.data.length-1].x;
+                // calculate X
+                const y0 = k*0 + b;
+                const y1 = k*(ds.data.length-1) + b;
+                // use X to fit
+                const fitData = [
+                    {x: x0, y: k*0 + b},
+                    {x: x1, y: k*(ds.data.length-1) + b}
+                ];
+                fitLines.push({
+                    label: `${ds.label} fit`,
+                    data: [
+                        {x: x0, y: k*0 + b},
+                        {x: x1, y: k*(ds.data.length-1) + b}
+                    ],
+                    borderColor: ds.borderColor,
+                    borderDash: [6, 4],
+                    borderWidth: 2,
+                    backgroundColor: 'transparent',
+                    fill: false,
+                    tension: 0,
+                    pointRadius: 0,
+                    showLine: true,
+                    order: 99,
+                    fitFormula: `y = ${k.toFixed(2)}x + ${b.toFixed(2)}`,
+                    _fitColor: ds.borderColor
+                });
+            }
+        });
+
+        // combine data set
+        let allDatasets = [...datasets];
+        fitLines.forEach(fit => {
+            allDatasets.push({
+                label: fit.label,
+                data: fit.data,
+                borderColor: fit.borderColor,
+                borderDash: fit.borderDash,
+                borderWidth: fit.borderWidth,
+                backgroundColor: fit.backgroundColor,
+                fill: fit.fill,
+                tension: fit.tension,
+                pointRadius: fit.pointRadius,
+                showLine: fit.showLine,
+                order: fit.order,
+                fitFormula: fit.fitFormula,
+                _fitColor: fit._fitColor
+            });
+        });
+
+
+        // fit line only for line / bar / radar charts
+        let chartType = selectedChartType;
+        if (chartType === 'pie' || chartType === 'doughnut') {
+            // don't add fit line
             const first = datasets[0];
             if (!first) return;
-
-            if (!currentChart) {
-                currentChart = new Chart(chartCtx, {
-                    type: selectedChartType,
-                    data: {
-                        labels: first.data.map(p => new Date(p.x).toLocaleString()),
-                        datasets: [{
-                            label: first.label,
-                            data: first.data.map(p => p.y),
-                            backgroundColor: pieColors(first.data.length) //
-                        }]
-                    },
-                    options: {
-                        responsive: false,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: true } }
-                    }
-                });
-            } else {
-                currentChart.labels = first.data.map(p => new Date(p.x).toLocaleString());
-
-                currentChart.data.datasets = datasets;
-                currentChart.update('none');
-            }
-
-        } else {
-            if (!currentChart) {
-                // line, bar, radar
-
-                currentChart = new Chart(chartCtx, {
-                    type: selectedChartType,
-                    data: { datasets },
-                    options: {
-                        responsive: false,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: true } },
-                        scales: {
-                            x: {
-                                type: 'time',
-                                time: { unit: timeUnitMap[selectedTimeRange] || 'day' },
-                                title: { display: true, text: 'time' },
-                                ticks: { autoSkip: true, maxTicksLimit: 10 }
-                            },
-                            y: {
-                                beginAtZero: true,
-                                title: { display: true, text: 'value' }
+            currentChart = new Chart(chartCtx, {
+                type: chartType,
+                data: {
+                    labels: first.data.map(p => new Date(p.x).toLocaleString()),
+                    datasets: [{
+                        label: first.label,
+                        data: first.data.map(p => p.y),
+                        backgroundColor: pieColors(first.data.length)
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: {
+                                usePointStyle: true
                             }
                         }
                     }
-                });
-            } else {
-                currentChart.data.datasets = datasets;
-                currentChart.update('none');
-            }
+                }
+            });
+        } else {
+            currentChart = new Chart(chartCtx, {
+                type: chartType,
+                data: { datasets: allDatasets },
+                options: {
+                    responsive: false,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: {
+                                usePointStyle: true // fix legend click issue
+                            },
+                            onClick: function(e, legendItem, legend) {
+                                // fix legend click position issue
+                                const index = legendItem.datasetIndex;
+                                const ci = legend.chart;
+                                const meta = ci.getDatasetMeta(index);
+                                // only hide dataset exclude fit line
+                                if (meta.hidden === null) {
+                                    meta.hidden = !ci.data.datasets[index].hidden;
+                                } else {
+                                    meta.hidden = null;
+                                }
+                                ci.update();
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: { unit: timeUnitMap[selectedTimeRange] || 'day' },
+                            title: { display: true, text: 'time' },
+                            ticks: { autoSkip: true, maxTicksLimit: 10 }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'value' }
+                        }
+                    }
+                },
+                plugins: [{
+                    id: 'fitFormulaLabel',
+                    afterDraw(chart) {
+                        // show fit equation
+                        const ctx = chart.ctx;
+                        let y = 30;
+                        chart.data.datasets.forEach((ds, i) => {
+                            if (ds.fitFormula) {
+                                ctx.save();
+                                ctx.font = 'bold 13px Segoe UI';
+                                ctx.fillStyle = ds._fitColor || '#0e838f';
+                                ctx.textBaseline = 'top';
+                                ctx.fillText(ds.fitFormula, 60, y);
+                                y += 20;
+                                ctx.restore();
+                            }
+                        });
+                    }
+                }]
+            });
         }
-        showChartStats(datasets);
+        showChartStats(datasets, fitLines);
     }
 
-    // pie colors
-    function pieColors(count) {
-        // return count colors from a predefined set
-        const baseColors = [
-            '#0e838f', '#8a2be2', '#ff7f50', '#ffdc34', '#0ecb81', '#c74e4e', '#bc7af9',
-            '#f08a5d', '#f9ed69', '#3ec1d3', '#ffb6b9', '#283c63'
-        ];
-        return Array(count).fill(0).map((_,i)=>baseColors[i%baseColors.length]);
+    // --- chart statistics and trend analysis ---
+    function showChartStats(datasets, fitLines) {
+        let statsHtml = '';
+        if (!datasets || !datasets.length) {
+            document.getElementById('chartStats')?.remove();
+            return;
+        }
+        statsHtml += `<div style="margin-top:15px;" id="chartStats"><h3>Statistical analysis</h3>`;
+        statsHtml += `<table style="border-collapse:collapse;width:100%;background:#fff;border-radius:8px;box-shadow:0 2px 8px #eee;">`;
+        statsHtml += `<tr style="background:#0e838f;color:#fff;"><th>Name</th><th>Mean</th><th>Max</th><th>Min</th><th>Trend</th></tr>`;
+        datasets.forEach(ds => {
+            const values = ds.data.map(p => p.y);
+            if (!values.length) return;
+            const avg = (values.reduce((a,b)=>a+b,0)/values.length).toFixed(2);
+            const max = Math.max(...values).toFixed(2);
+            const min = Math.min(...values).toFixed(2);
+            // Simple trend detection
+            const trend = values[0] < values[values.length-1] ? 'Increasing' : (values[0] > values[values.length-1] ? 'Decreasing' : 'Stable');
+            statsHtml += `<tr>
+                <td>${ds.label}</td>
+                <td>${avg}</td>
+                <td>${max}</td>
+                <td>${min}</td>
+                <td>${trend}</td>
+            </tr>`;
+        });
+        statsHtml += `</table>`;
+
+        // Fitted Line Display
+        if (fitLines && fitLines.length) {
+            statsHtml += `<div style="margin-top:10px;">`;
+            fitLines.forEach(fit => {
+                statsHtml += `<span style="display:inline-block;margin-right:20px;color:${fit._fitColor};font-weight:bold;">${fit.fitFormula}</span>`;
+            });
+            statsHtml += `</div>`;
+        }
+        statsHtml += `</div>`;
+
+        // insert or replace
+        let statsDiv = document.getElementById('chartStats');
+        if (!statsDiv) {
+            statsDiv = document.createElement('div');
+            statsDiv.id = 'chartStats';
+            document.getElementById('sensorDataChart').parentNode.appendChild(statsDiv);
+        }
+        statsDiv.outerHTML = statsHtml;
     }
 
-    function randomColor() {
-        return 'hsl(' + Math.floor(Math.random() * 360) + ', 70%, 50%)';
+    // simple linear regression
+    function linearFit(points) {
+        const n = points.length;
+        let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+        for (let i = 0; i < n; i++) {
+            const x = i, y = points[i].y;
+            sumX += x;
+            sumY += y;
+            sumXY += x * y;
+            sumXX += x * x;
+        }
+        const k = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX + 1e-8);
+        const b = (sumY - k * sumX) / n;
+        return {k, b};
     }
 
     async function loadWidgets() {
@@ -916,7 +1060,7 @@
         localStorage.setItem('lastSensorId', data.sensor_id);
         lastSensorId= data.sensor_id;
         alert('Added sensor ID: ' + data.sensor_id);
-        await loadTestSensorList();
+        await loadTestDeviceList();
         return data.sensor_id;
     }
 
@@ -1014,70 +1158,6 @@
     }
     function reloadSensor(){
 
-    }
-
-    // --- chart statistics and trend analysis ---
-    function showChartStats(datasets) {
-        let statsHtml = '';
-        if (!datasets || !datasets.length) {
-            document.getElementById('chartStats')?.remove();
-            return;
-        }
-        statsHtml += `<div style="margin-top:15px;" id="chartStats"><h3>Statistical analysis</h3>`;
-        statsHtml += `<table style="border-collapse:collapse;width:100%;background:#fff;border-radius:8px;box-shadow:0 2px 8px #eee;">`;
-        statsHtml += `<tr style="background:#0e838f;color:#fff;"><th>Name</th><th>Mean</th><th>Max</th><th>Min</th><th>Trend</th></tr>`;
-        datasets.forEach(ds => {
-            const values = ds.data.map(p => p.y);
-            if (!values.length) return;
-            const avg = (values.reduce((a,b)=>a+b,0)/values.length).toFixed(2);
-            const max = Math.max(...values).toFixed(2);
-            const min = Math.min(...values).toFixed(2);
-            // Simple trend detection
-            const trend = values[0] < values[values.length-1] ? 'Increasing' : (values[0] > values[values.length-1] ? 'Decreasing' : 'Stable');
-            statsHtml += `<tr>
-                <td>${ds.label}</td>
-                <td>${avg}</td>
-                <td>${max}</td>
-                <td>${min}</td>
-                <td>${trend}</td>
-            </tr>`;
-        });
-        statsHtml += `</table>`;
-
-        // Fitted Line Display
-        statsHtml += `<div style="margin-top:10px;">`;
-        datasets.forEach(ds => {
-            if (ds.data.length > 1) {
-                const {k, b} = linearFit(ds.data);
-                statsHtml += `<span style="display:inline-block;margin-right:20px;color:#0e838f;">${ds.label} fit: y = ${k.toFixed(2)}x + ${b.toFixed(2)}</span>`;
-            }
-        });
-        statsHtml += `</div></div>`;
-
-        // insert or replace
-        let statsDiv = document.getElementById('chartStats');
-        if (!statsDiv) {
-            statsDiv = document.createElement('div');
-            statsDiv.id = 'chartStats';
-            document.getElementById('sensorDataChart').parentNode.appendChild(statsDiv);
-        }
-        statsDiv.outerHTML = statsHtml;
-    }
-
-    // simple linear regression
-    function linearFit(points) {
-        const n = points.length;
-        let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-        for (let i = 0; i < n; i++) {
-            const x = i, y = points[i].y;
-            sumX += x;
-            sumY += y;
-            sumXY += x * y;
-            sumXX += x * x;
-        }
-        const k = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX + 1e-8);
-        const b = (sumY - k * sumX) / n;
-        return {k, b};
     }
 
     // --- Test Tab Device/Sensor List ---
