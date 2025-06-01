@@ -42,6 +42,8 @@ npm create cloudflare@latest -- --template=YOUR_TEMPLATE_PATH_HERE # TODO: Updat
 1. Install the project dependencies with a package manager of your choice:
    ```bash
    npm install
+   npm install -g wrangler
+   wrangler login
    ```
 2. Create a [D1 database](https://developers.cloudflare.com/d1/get-started/) (e.g., "iot_dashboard_db"):
    ```bash

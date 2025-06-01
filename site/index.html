@@ -187,10 +187,14 @@
     <section id="test" class="tab-content">
         <h2>Test Add Data</h2>
         <button id="btnAddDevice">Add Device</button>
-        <button id="btnAddControl">Add Control (add device first)</button>
         <button id="btnAddSensor">Add Sensor (add device first)</button>
+        <button id="btnAddControl">Add Control (add sensor first)</button>
         <button id="btnAddSensorData">Add Sensor Data (add sensor first)</button>
         <button id="btnAddAll">Add All Test Data</button>
+        <div style="margin-top:10px;">
+            <button id="btnTestDelete">Test Delete</button>
+            <span id="lastDeviceInfo" style="margin-left:10px;color:#0e838f;font-weight:bold;"></span>
+        </div>
     </section>
 </main>
 <script>
@@ -199,6 +203,12 @@
     let autoRefreshTimer = null;
     let chartDataCache = []; // all sensor data cache
     let chartLastTimestamp = 0;
+
+    // local storage variables
+    let lastDeviceId = localStorage.getItem('lastDeviceId') || null;
+    let lastControlId = localStorage.getItem('lastControlId') || null;
+    let lastSensorId = localStorage.getItem('lastSensorId') || null;
+    let lastSensorDataId = localStorage.getItem('lastSensorDataId') || null;
 
     // --- TAB ---
     const tabs = document.querySelectorAll('.tabBtn');
@@ -210,7 +220,11 @@
             contents.forEach(c => c.classList.remove('active'));
             document.getElementById(tab.dataset.tab).classList.add('active');
 
-
+            // Show lastDeviceId beside testDelete button when Test tab is active
+            if (tab.dataset.tab === 'test') {
+                const lastDeviceId = localStorage.getItem('lastDeviceId') || '';
+                document.getElementById('lastDeviceInfo').textContent = lastDeviceId ? `lastDeviceId: ${lastDeviceId}` : 'No lastDeviceId';
+            }
         });
     });
 
@@ -729,15 +743,16 @@
         // Add Test buttons
         document.getElementById('btnAddDevice').addEventListener('click', addTestDevice);
 
-        let lastDeviceId = localStorage.getItem('lastDeviceId') || null;
-        let lastControlId = localStorage.getItem('lastControlId') || null;
-        let lastSensorId = localStorage.getItem('lastSensorId') || null;
-        let lastSensorDataId = localStorage.getItem('lastSensorDataId') || null;
+
 
         document.getElementById('btnAddControl').addEventListener('click', async () => {
             if (!lastDeviceId) {
                 lastDeviceId = await addTestDevice();
             }
+            if (!lastSensorId) {
+                lastDeviceId = await addTestSensor();
+            }
+
             await addTestControl(lastDeviceId);
         });
 
@@ -745,7 +760,7 @@
             if (!lastDeviceId) {
                 lastDeviceId = await addTestDevice();
             }
-            lastSensorId = await addTestSensor(lastDeviceId);
+            await addTestSensor(lastDeviceId);
         });
 
         document.getElementById('btnAddSensorData').addEventListener('click', async () => {
@@ -758,6 +773,59 @@
 
         document.getElementById('btnAddAll').addEventListener('click', addTestAll);
 
+        // Test Delete button logic
+        document.getElementById('btnTestDelete').addEventListener('click', async () => {
+            const lastDeviceId = localStorage.getItem('lastDeviceId');
+            if (!lastDeviceId) {
+                alert('No lastDeviceId found.');
+                return;
+            }
+            if (!confirm(`Delete device ${lastDeviceId} and all related data?`)) return;
+
+            try {
+                // 1. Delete all controls with this device_id
+                await fetch(`/api/controls?device_id=${lastDeviceId}`, { method: 'GET' })
+                    .then(res => res.json())
+                    .then(async controls => {
+                        for (const ctrl of controls) {
+                            await fetch(`/api/controls?control_id=${ctrl.control_id}`, { method: 'DELETE' });
+                        }
+                    });
+
+                // 2. Delete all sensors with this device_id and their sensor_data
+                await fetch(`/api/sensors?device_id=${lastDeviceId}&limit=100`, { method: 'GET' })
+                    .then(res => res.json())
+                    .then(async sensors => {
+                        for (const sensor of sensors) {
+                            // Delete sensor_data for this sensor
+                            await fetch(`/api/sensor_data?sensor_id=${sensor.sensor_id}&limit=1000`, { method: 'GET' })
+                                .then(res => res.json())
+                                .then(async datas => {
+                                    for (const data of datas) {
+                                        // If you had a DELETE for sensor_data, you could call it here
+                                        // But index.ts does not implement DELETE for sensor_data, so skip
+                                    }
+                                });
+                            // Delete the sensor itself
+                            await fetch(`/api/sensors?sensor_id=${sensor.sensor_id}`, { method: 'DELETE' });
+                        }
+                    });
+
+                // 3. Delete the device itself
+                await fetch(`/api/device?device_id=${lastDeviceId}`, { method: 'DELETE' });
+
+                // 4. Clear localStorage keys
+                localStorage.removeItem('lastDeviceId');
+                localStorage.removeItem('lastControlId');
+                localStorage.removeItem('lastSensorId');
+                localStorage.removeItem('lastSensorDataId');
+
+                document.getElementById('lastDeviceInfo').textContent = 'No lastDeviceId';
+                alert('Device and related data deleted.');
+            } catch (e) {
+                alert('Delete failed: ' + e);
+            }
+        });
 
     }
 
@@ -777,6 +845,7 @@
             return null;
         }
         localStorage.setItem('lastDeviceId', data.insertedId);
+        lastDeviceId = data.insertedId;
         alert('Added device ID: '+data.insertedId);
         return data.insertedId;
     }
@@ -788,6 +857,7 @@
         }
         const testControl = {
             device_id: deviceId,
+            control_id: lastSensorId,
             control_type: 'button',
             control_name: 'Test Control',
             state: 'off'
@@ -803,6 +873,7 @@
             return null;
         }
         localStorage.setItem('lastControlId', data.control_id);
+        lastControlId= data.control_id;
         alert('Added control ID: ' + data.control_id);
         return data.control_id;
     }
@@ -828,6 +899,7 @@
             return null;
         }
         localStorage.setItem('lastSensorId', data.sensor_id);
+        lastSensorId= data.sensor_id;
         alert('Added sensor ID: ' + data.sensor_id);
         return data.sensor_id;
     }
