@@ -244,7 +244,17 @@ async function handleSensorData(request, db, searchParams) {
     return json({ data_id: insert.meta.last_row_id });
   }
 
+
   // put and delete methods can be implemented as needed, generally POST is used for uploading data, and GET is used for querying
+  if (request.method === 'Delete') {
+    // delete sensor data, need to specify sensor_id and timestamp in query params (?sensor_id=xxx&timestamp=xxx)
+    const sensor_id = searchParams.get('sensor_id');
+    // const timestamp = searchParams.get('timestamp');
+    if (!sensor_id) return text('Missing sensor_id or timestamp', 400);
+
+    const del = await db.prepare('DELETE FROM sensor_data WHERE sensor_id = ?').bind(sensor_id).run();
+    return json({ deleted: del.changes });
+  }
 }
 // @ts-ignore
 async function handleControls(request, db, searchParams) {

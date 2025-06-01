@@ -186,6 +186,14 @@
     <!-- Test Tab -->
     <section id="test" class="tab-content">
         <h2>Test Add Data</h2>
+        <div style="margin-bottom:10px;">
+            <label>Test Devices:</label>
+            <div id="testDeviceList"></div>
+        </div>
+        <div style="margin-bottom:10px;">
+            <label>Test Sensors:</label>
+            <div id="testSensorList"></div>
+        </div>
         <button id="btnAddDevice">Add Device</button>
         <button id="btnAddSensor">Add Sensor (add device first)</button>
         <button id="btnAddControl">Add Control (add sensor first)</button>
@@ -222,8 +230,7 @@
 
             // Show lastDeviceId beside testDelete button when Test tab is active
             if (tab.dataset.tab === 'test') {
-                const lastDeviceId = localStorage.getItem('lastDeviceId') || '';
-                document.getElementById('lastDeviceInfo').textContent = lastDeviceId ? `lastDeviceId: ${lastDeviceId}` : 'No lastDeviceId';
+                loadTestDeviceList();
             }
         });
     });
@@ -545,6 +552,7 @@
                 currentChart.update('none');
             }
         }
+        showChartStats(datasets);
     }
 
     // pie colors
@@ -775,16 +783,19 @@
 
         // Test Delete button logic
         document.getElementById('btnTestDelete').addEventListener('click', async () => {
-            const lastDeviceId = localStorage.getItem('lastDeviceId');
-            if (!lastDeviceId) {
-                alert('No lastDeviceId found.');
+
+            // delete selected device and related data
+            const radios = document.querySelectorAll('input[name="testDeviceRadio"]:checked');
+            const deviceId = radios.length ? radios[0].value : null;
+            if (!deviceId) {
+                alert('Pls select Test Device you want to delete');
                 return;
             }
-            if (!confirm(`Delete device ${lastDeviceId} and all related data?`)) return;
+            if (!confirm(`Delete device ${deviceId} and all related data?`)) return;
 
             try {
-                // 1. Delete all controls with this device_id
-                await fetch(`/api/controls?device_id=${lastDeviceId}`, { method: 'GET' })
+                // 1. delete all controls data belong the device_id
+                await fetch(`/api/controls?device_id=${deviceId}`, { method: 'GET' })
                     .then(res => res.json())
                     .then(async controls => {
                         for (const ctrl of controls) {
@@ -792,35 +803,38 @@
                         }
                     });
 
-                // 2. Delete all sensors with this device_id and their sensor_data
-                await fetch(`/api/sensors?device_id=${lastDeviceId}&limit=100`, { method: 'GET' })
+                // 2. delete all sensors belong to device_id
+                await fetch(`/api/sensors?device_id=${deviceId}&limit=100`, { method: 'GET' })
                     .then(res => res.json())
                     .then(async sensors => {
                         for (const sensor of sensors) {
-                            // Delete sensor_data for this sensor
-                            await fetch(`/api/sensor_data?sensor_id=${sensor.sensor_id}&limit=1000`, { method: 'GET' })
-                                .then(res => res.json())
-                                .then(async datas => {
-                                    for (const data of datas) {
-                                        // If you had a DELETE for sensor_data, you could call it here
-                                        // But index.ts does not implement DELETE for sensor_data, so skip
+                            // delete sensor_data
+                            await fetch(`/api/sensor_data?sensor_id=${sensor.sensor_id}`, { method: 'GET' })
+                                .then(res => {
+                                    // show the return  from server
+                                    if (res.ok) {
+                                        return res.json();
+                                    } else {
+                                        throw new Error('Failed to fetch sensor data');
                                     }
+
                                 });
-                            // Delete the sensor itself
+                            // delete sensor
                             await fetch(`/api/sensors?sensor_id=${sensor.sensor_id}`, { method: 'DELETE' });
                         }
                     });
 
-                // 3. Delete the device itself
-                await fetch(`/api/device?device_id=${lastDeviceId}`, { method: 'DELETE' });
+                // 3. delete device itself
+                await fetch(`/api/device?device_id=${deviceId}`, { method: 'DELETE' });
 
-                // 4. Clear localStorage keys
+                // 4. clean localStorage
                 localStorage.removeItem('lastDeviceId');
                 localStorage.removeItem('lastControlId');
                 localStorage.removeItem('lastSensorId');
                 localStorage.removeItem('lastSensorDataId');
 
                 document.getElementById('lastDeviceInfo').textContent = 'No lastDeviceId';
+                loadTestDeviceList();
                 alert('Device and related data deleted.');
             } catch (e) {
                 alert('Delete failed: ' + e);
@@ -847,6 +861,7 @@
         localStorage.setItem('lastDeviceId', data.insertedId);
         lastDeviceId = data.insertedId;
         alert('Added device ID: '+data.insertedId);
+        await loadTestDeviceList();
         return data.insertedId;
     }
 
@@ -901,6 +916,7 @@
         localStorage.setItem('lastSensorId', data.sensor_id);
         lastSensorId= data.sensor_id;
         alert('Added sensor ID: ' + data.sensor_id);
+        await loadTestSensorList();
         return data.sensor_id;
     }
 
@@ -1000,9 +1016,142 @@
 
     }
 
+    // --- chart statistics and trend analysis ---
+    function showChartStats(datasets) {
+        let statsHtml = '';
+        if (!datasets || !datasets.length) {
+            document.getElementById('chartStats')?.remove();
+            return;
+        }
+        statsHtml += `<div style="margin-top:15px;" id="chartStats"><h3>Statistical analysis</h3>`;
+        statsHtml += `<table style="border-collapse:collapse;width:100%;background:#fff;border-radius:8px;box-shadow:0 2px 8px #eee;">`;
+        statsHtml += `<tr style="background:#0e838f;color:#fff;"><th>Name</th><th>Mean</th><th>Max</th><th>Min</th><th>Trend</th></tr>`;
+        datasets.forEach(ds => {
+            const values = ds.data.map(p => p.y);
+            if (!values.length) return;
+            const avg = (values.reduce((a,b)=>a+b,0)/values.length).toFixed(2);
+            const max = Math.max(...values).toFixed(2);
+            const min = Math.min(...values).toFixed(2);
+            // Simple trend detection
+            const trend = values[0] < values[values.length-1] ? 'Increasing' : (values[0] > values[values.length-1] ? 'Decreasing' : 'Stable');
+            statsHtml += `<tr>
+                <td>${ds.label}</td>
+                <td>${avg}</td>
+                <td>${max}</td>
+                <td>${min}</td>
+                <td>${trend}</td>
+            </tr>`;
+        });
+        statsHtml += `</table>`;
+
+        // Fitted Line Display
+        statsHtml += `<div style="margin-top:10px;">`;
+        datasets.forEach(ds => {
+            if (ds.data.length > 1) {
+                const {k, b} = linearFit(ds.data);
+                statsHtml += `<span style="display:inline-block;margin-right:20px;color:#0e838f;">${ds.label} fit: y = ${k.toFixed(2)}x + ${b.toFixed(2)}</span>`;
+            }
+        });
+        statsHtml += `</div></div>`;
+
+        // insert or replace
+        let statsDiv = document.getElementById('chartStats');
+        if (!statsDiv) {
+            statsDiv = document.createElement('div');
+            statsDiv.id = 'chartStats';
+            document.getElementById('sensorDataChart').parentNode.appendChild(statsDiv);
+        }
+        statsDiv.outerHTML = statsHtml;
+    }
+
+    // simple linear regression
+    function linearFit(points) {
+        const n = points.length;
+        let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+        for (let i = 0; i < n; i++) {
+            const x = i, y = points[i].y;
+            sumX += x;
+            sumY += y;
+            sumXY += x * y;
+            sumXX += x * x;
+        }
+        const k = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX + 1e-8);
+        const b = (sumY - k * sumX) / n;
+        return {k, b};
+    }
+
+    // --- Test Tab Device/Sensor List ---
+    async function loadTestDeviceList() {
+        // get all device whose device_name contains "test"
+        const res = await fetch('/api/device?device_name=test&limit=100');
+        const devices = await res.json();
+        const testDeviceList = document.getElementById('testDeviceList');
+        testDeviceList.innerHTML = '';
+        if (!devices.length) {
+            testDeviceList.innerHTML = '<span style="color:#e74c3c;">No test device found.</span>';
+            document.getElementById('testSensorList').innerHTML = '';
+            document.getElementById('lastDeviceInfo').textContent = 'No lastDeviceId';
+            return;
+        }
+        // single-select list
+        devices.forEach((d, idx) => {
+            const radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = 'testDeviceRadio';
+            radio.value = d.device_id;
+            if (idx === 0) radio.checked = true;
+            radio.addEventListener('change', () => {
+                localStorage.setItem('lastDeviceId', d.device_id);
+                loadTestSensorList(d.device_id);
+                document.getElementById('lastDeviceInfo').textContent = `lastDeviceId: ${d.device_id}`;
+            });
+            testDeviceList.appendChild(radio);
+            const label = document.createElement('label');
+            label.textContent = `${d.device_name} (${d.device_id})`;
+            label.style.marginRight = '15px';
+            testDeviceList.appendChild(label);
+        });
+        // default select first
+        const firstId = devices[0].device_id;
+        localStorage.setItem('lastDeviceId', firstId);
+        document.getElementById('lastDeviceInfo').textContent = `lastDeviceId: ${firstId}`;
+        loadTestSensorList(firstId);
+    }
+
+    async function loadTestSensorList(deviceId) {
+        if (!deviceId) {
+            document.getElementById('testSensorList').innerHTML = '';
+            return;
+        }
+        const res = await fetch(`/api/sensors?device_id=${deviceId}&limit=100`);
+        const sensors = await res.json();
+        const testSensorList = document.getElementById('testSensorList');
+        testSensorList.innerHTML = '';
+        if (!sensors.length) {
+            testSensorList.innerHTML = '<span style="color:#e74c3c;">No sensor found.</span>';
+            return;
+        }
+        sensors.forEach((s, idx) => {
+            const radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = 'testSensorRadio';
+            radio.value = s.sensor_id;
+            if (idx === 0) radio.checked = true;
+            radio.addEventListener('change', () => {
+                localStorage.setItem('lastSensorId', s.sensor_id);
+            });
+            testSensorList.appendChild(radio);
+            const label = document.createElement('label');
+            label.textContent = `${s.sensor_name} (${s.sensor_id})`;
+            label.style.marginRight = '15px';
+            testSensorList.appendChild(label);
+        });
+        // default select first
+        localStorage.setItem('lastSensorId', sensors[0].sensor_id);
+    }
+
     // --- initial ---
     init();
-
 
 </script>
 </body>
