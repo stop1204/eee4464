@@ -417,12 +417,10 @@
 
     // --- init ---
     async function initDashboard() {
-            console.log('Initializing dashboard...');
+        console.log('Initializing dashboard...');
         loadSettings();
         setupEventListeners(); // Original event listeners  this should be called after login and brefore loading devices
         await loadDevices(); // This will now use user-specific devices
-
-        startAutoRefresh();
         startMessageChecker(); // Start message checker after login
     }
 
@@ -755,29 +753,76 @@
 
     async function fetchNewSensorData() {
         if (!selectedSensorIds.length || !chartLastTimestamp) return;
+        // console.log(`Fetching new sensor data... (${new Date().toISOString()})`);
+        // console.log(`Number of sensors to check: ${chartDataCache.length}`);
+        
         const now = Math.floor(Date.now() / 1000);
         let hasUpdate = false;
-        await Promise.all(chartDataCache.map(async (d) => {
-            const resp = await fetch(`/api/sensor_data?sensor_id=${d.sensorId}&start=${Math.floor(chartLastTimestamp/1000)+1}&end=${now}&limit=100`);
+        
+        // Group chartDataCache entries by sensorId to avoid redundant API calls
+        const sensorGroups = {};
+        chartDataCache.forEach((entry, index) => {
+            if (!sensorGroups[entry.sensorId]) {
+                sensorGroups[entry.sensorId] = {
+                    sensorId: entry.sensorId,
+                    fields: [],
+                    cacheIndices: []
+                };
+            }
+            sensorGroups[entry.sensorId].fields.push(entry.field);
+            sensorGroups[entry.sensorId].cacheIndices.push(index);
+        });
+        
+        // console.log(`Optimized: Making ${Object.keys(sensorGroups).length} API calls instead of ${chartDataCache.length}`);
+        
+        // Now make one API call per sensor rather than per field
+        await Promise.all(Object.values(sensorGroups).map(async (group) => {
+            const startTime = Math.floor(chartLastTimestamp/1000) + 1;
+            // console.log(`Fetching data for sensor ${group.sensorId}, fields: ${group.fields.join(', ')}, start: ${startTime}, end: ${now}`);
+            
+            const resp = await fetch(`/api/sensor_data?sensor_id=${group.sensorId}&start=${startTime}&end=${now}&limit=100`);
             const data = await resp.json();
-            if (!data.length) return;
-            const newPoints = [];
-            data.forEach(row => {
-                const val = JSON.parse(row.data)[d.field];
-                if (val !== undefined) {
-                    newPoints.push({
-                        x: row.timestamp * 1000,
-                        y: parseFloat(val)
-                    });
+            
+            if (!data.length) {
+                // console.log(`No new data found for sensor ${group.sensorId}`);
+                return;
+            }
+            
+            // console.log(`Found ${data.length} new data points for sensor ${group.sensorId}`);
+
+            // Update all fields from this sensor data
+            group.cacheIndices.forEach((cacheIndex) => {
+                const entry = chartDataCache[cacheIndex];
+                const field = entry.field;
+                const newPoints = [];
+                
+                data.forEach(row => {
+                    try {
+                        const parsedData = JSON.parse(row.data);
+                        const val = parsedData[field];
+                        if (val !== undefined) {
+                            newPoints.push({
+                                x: row.timestamp * 1000,
+                                y: parseFloat(val)
+                            });
+                        }
+                    } catch (err) {
+                        console.warn(`Error parsing data for sensor ${group.sensorId}, field ${field}:`, err);
+                    }
+                });
+                
+                if (newPoints.length) {
+                    console.log(`Adding ${newPoints.length} valid points for field ${field}`);
+                    entry.points = entry.points.concat(newPoints);
+                    hasUpdate = true;
+                } else {
+                    console.log(`No valid points found for field ${field}`);
                 }
             });
-            if (newPoints.length) {
-                d.points = d.points.concat(newPoints);
-                hasUpdate = true;
-            }
         }));
 
         if (hasUpdate) {
+            console.log(`Updating chart with new data...`);
             chartLastTimestamp = Math.max(...chartDataCache.map(d => d.points.length ? d.points[d.points.length-1].x : 0));
             const datasets = chartDataCache.map((d,i) => ({
                 label:`${d.field} (Sensor:${d.sensorId})`,
@@ -789,6 +834,8 @@
                 pointRadius: 2
             }));
             renderChart(datasets);
+        } else {
+            console.log(`No updates needed for chart.`);
         }
     }
 
