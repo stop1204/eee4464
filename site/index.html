@@ -8,8 +8,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background: #f5f7fa; }
-        header { padding: 10px 20px; background: #0e838f; color: white; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background: #f5f7fa; display: flex; flex-direction: column; min-height: 100vh; }
+        header { padding: 10px 20px; background: #0e838f; color: white; display: flex; justify-content: space-between; align-items: center; }
         header h1 { margin: 0; font-weight: 700; }
         nav { display: flex; border-bottom: 2px solid #ddd; background: white; }
         nav button {
@@ -86,7 +86,6 @@
             margin-bottom: 10px;
         }
 
-
         #sensorDataChart {
             width: 100% !important;
             max-width: 800px;
@@ -104,107 +103,212 @@
                 height: auto !important;
             }
         }
+
+        /* Login Form Styles */
+        #loginSection, #registrationSection {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex-grow: 1;
+            padding: 20px;
+        }
+        .login-container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 360px;
+            text-align: center;
+        }
+        .login-container h2 {
+            color: #0e838f;
+            margin-bottom: 20px;
+        }
+        .login-container input[type="text"],
+        .login-container input[type="password"] {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+        .login-container button {
+            width: 100%;
+            padding: 12px;
+            background: #0e838f;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+        .login-container button:hover {
+            background: #0c707a;
+        }
+        #loginError, #registrationError {
+            color: red;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        #logoutButton {
+            padding: 8px 15px;
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.3s ease;
+        }
+        #logoutButton:hover {
+            background-color: #c0392b;
+        }
+        .form-switch-link {
+            display: block;
+            margin-top: 15px;
+            color: #0e838f;
+            text-decoration: none;
+            font-size: 0.9em;
+        }
+        .form-switch-link:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
-<header>
-    <h1>🌟 EEE4464 IoT Dashboard</h1>
-</header>
 
-<nav>
-    <button class="tabBtn active" data-tab="dashboard">Dashboard</button>
-    <button class="tabBtn" data-tab="widgets">Widgets</button>
-    <button class="tabBtn" data-tab="settings">Settings</button>
-    <button class="tabBtn" data-tab="test">Test</button>
-</nav>
+<div id="loginSection" style="display:none;">
+    <div class="login-container">
+        <h2>Dashboard Login</h2>
+        <form id="loginForm">
+            <input type="text" id="username" placeholder="Username" required />
+            <input type="password" id="password" placeholder="Password" required />
+            <button type="submit">Login</button>
+            <p id="loginError" style="display:none;"></p>
+        </form>
+        <a href="#" id="switchToRegister" class="form-switch-link">Don't have an account? Register</a>
+    </div>
+</div>
 
-<main>
-    <!-- Dashboard Tab -->
-    <section id="dashboard" class="tab-content active">
-        <div style="margin:10px 0;">
-            <label><input type="checkbox" id="autoRefreshCheckbox" /> Auto Refresh</label>
-            <input type="number" id="autoRefreshInterval" value="1" min="1" style="width:60px;" /> seconds
-        </div>
-        <div>
-            <label>Select Device:</label><br />
-            <select id="deviceSelect"><option>Loading...</option></select>
-        </div>
-        <div>
-            <label>Select Sensors (multiple):</label><br />
-            <select id="sensorSelect" multiple size="5"></select>
-        </div>
-        <div class="btn-group" id="timeRangeButtons">
-            <button data-range="hour" class="active">Hour</button>
-            <button data-range="day">Day</button>
-            <button data-range="week">Week</button>
-            <button data-range="month">Month</button>
-            <button data-range="year">Year</button>
-        </div>
-        <div>
-            <label>Select Chart Type:</label><br />
-            <select id="chartTypeSelect">
-                <option value="line" selected>Line</option>
+<div id="registrationSection" style="display:none;">
+    <div class="login-container">
+        <h2>Create Account</h2>
+        <form id="registrationForm">
+            <input type="text" id="regUsername" placeholder="Username" required />
+            <input type="password" id="regPassword" placeholder="Password" required />
+            <input type="password" id="regConfirmPassword" placeholder="Confirm Password" required />
+            <button type="submit">Register</button>
+            <p id="registrationError" style="display:none;"></p>
+        </form>
+        <a href="#" id="switchToLogin" class="form-switch-link">Already have an account? Login</a>
+    </div>
+</div>
+
+<div id="dashboardSection" style="display:none;">
+    <header>
+        <h1>🌟 EEE4464 IoT Dashboard</h1>
+        <button id="logoutButton">Logout</button>
+    </header>
+
+    <nav>
+        <button class="tabBtn active" data-tab="dashboard">Dashboard</button>
+        <button class="tabBtn" data-tab="widgets">Widgets</button>
+        <button class="tabBtn" data-tab="settings">Settings</button>
+        <button class="tabBtn" data-tab="test">Test</button>
+    </nav>
+
+    <main>
+        <!-- Dashboard Tab -->
+        <section id="dashboard" class="tab-content active">
+            <div style="margin:10px 0;">
+                <label><input type="checkbox" id="autoRefreshCheckbox" /> Auto Refresh</label>
+                <input type="number" id="autoRefreshInterval" value="1" min="1" style="width:60px;" /> seconds
+            </div>
+            <div>
+                <label>Select Device:</label><br />
+                <select id="deviceSelect"><option>Loading...</option></select>
+            </div>
+            <div>
+                <label>Select Sensors (multiple):</label><br />
+                <select id="sensorSelect" multiple size="5"></select>
+            </div>
+            <div class="btn-group" id="timeRangeButtons">
+                <button data-range="hour" class="active">Hour</button>
+                <button data-range="day">Day</button>
+                <button data-range="week">Week</button>
+                <button data-range="month">Month</button>
+                <button data-range="year">Year</button>
+            </div>
+            <div>
+                <label>Select Chart Type:</label><br />
+                <select id="chartTypeSelect">
+                    <option value="line" selected>Line</option>
+                    <option value="bar">Bar</option>
+                    <option value="pie">Pie</option>
+                    <option value="doughnut">Doughnut</option>
+                    <option value="radar">Radar</option>
+                </select>
+            </div>
+            <canvas id="sensorDataChart" width="800" height="400" style="max-width: 800px; height: 400px;"></canvas>
+        </section>
+
+        <!-- Widgets Tab -->
+        <section id="widgets" class="tab-content">
+            <button id="addWidgetBtn">Add Status Widget</button>
+            <div id="widgetContainer"></div>
+        </section>
+
+        <!-- Settings Tab -->
+        <section id="settings" class="tab-content">
+            <h2>User Settings</h2>
+            <p>Current settings are saved in browser <code>localStorage</code> and will not sync across devices.</p>
+            <label>Default Time Range:</label>
+            <select id="defaultTimeRangeSelect">
+                <option value="hour">Hour</option>
+                <option value="day">Day</option>
+                <option value="week">Week</option>
+                <option value="month">Month</option>
+                <option value="year">Year</option>
+            </select>
+            <br/>
+            <label>Default Chart Type:</label>
+            <select id="defaultChartTypeSelect">
+                <option value="line">Line</option>
                 <option value="bar">Bar</option>
                 <option value="pie">Pie</option>
                 <option value="doughnut">Doughnut</option>
                 <option value="radar">Radar</option>
             </select>
-        </div>
-        <canvas id="sensorDataChart" width="800" height="400" style="max-width: 800px; height: 400px;"></canvas>
-    </section>
-
-    <!-- Widgets Tab -->
-    <section id="widgets" class="tab-content">
-        <button id="addWidgetBtn">Add Status Widget</button>
-        <div id="widgetContainer"></div>
-    </section>
-
-    <!-- Settings Tab -->
-    <section id="settings" class="tab-content">
-        <h2>User Settings</h2>
-        <p>Current settings are saved in browser <code>localStorage</code> and will not sync across devices.</p>
-        <label>Default Time Range:</label>
-        <select id="defaultTimeRangeSelect">
-            <option value="hour">Hour</option>
-            <option value="day">Day</option>
-            <option value="week">Week</option>
-            <option value="month">Month</option>
-            <option value="year">Year</option>
-        </select>
-        <br/>
-        <label>Default Chart Type:</label>
-        <select id="defaultChartTypeSelect">
-            <option value="line">Line</option>
-            <option value="bar">Bar</option>
-            <option value="pie">Pie</option>
-            <option value="doughnut">Doughnut</option>
-            <option value="radar">Radar</option>
-        </select>
-        <br/><br/>
-        <button id="saveSettingsBtn">Save Settings</button>
-    </section>
-    <!-- Test Tab -->
-    <section id="test" class="tab-content">
-        <h2>Test Add Data</h2>
-        <div style="margin-bottom:10px;">
-            <label>Test Devices:</label>
-            <div id="testDeviceList"></div>
-        </div>
-        <div style="margin-bottom:10px;">
-            <label>Test Sensors:</label>
-            <div id="testSensorList"></div>
-        </div>
-        <button id="btnAddDevice">Add Device</button>
-        <button id="btnAddSensor">Add Sensor (add device first)</button>
-        <button id="btnAddControl">Add Control (add sensor first)</button>
-        <button id="btnAddSensorData">Add Sensor Data (add sensor first)</button>
-        <button id="btnAddAll">Add All Test Data</button>
-        <div style="margin-top:10px;">
-            <button id="btnTestDelete">Test Delete</button>
-            <span id="lastDeviceInfo" style="margin-left:10px;color:#0e838f;font-weight:bold;"></span>
-        </div>
-    </section>
-</main>
+            <br/><br/>
+            <button id="saveSettingsBtn">Save Settings</button>
+        </section>
+        <!-- Test Tab -->
+        <section id="test" class="tab-content">
+            <h2>Test Add Data</h2>
+            <div style="margin-bottom:10px;">
+                <label>Test Devices:</label>
+                <div id="testDeviceList"></div>
+            </div>
+            <div style="margin-bottom:10px;">
+                <label>Test Sensors:</label>
+                <div id="testSensorList"></div>
+            </div>
+            <button id="btnAddDevice">Add Device</button>
+            <button id="btnAddSensor">Add Sensor (add device first)</button>
+            <button id="btnAddControl">Add Control (add sensor first)</button>
+            <button id="btnAddSensorData">Add Sensor Data (add sensor first)</button>
+            <button id="btnAddAll">Add All Test Data</button>
+            <div style="margin-top:10px;">
+                <button id="btnTestDelete">Test Delete</button>
+                <span id="lastDeviceInfo" style="margin-left:10px;color:#0e838f;font-weight:bold;"></span>
+            </div>
+        </section>
+    </main>
+</div>
 <script>
 
     // chart
@@ -262,6 +366,9 @@
     let selectedChartType = 'line';
     let widgets = [];
 
+    // User session data
+    let currentUser = null;
+
     function getLineColor(label, idx) {
         if (!lineColors[label]) {
             const baseColors = [
@@ -292,51 +399,244 @@
     }
 
     // --- init ---
-    async function init() {
+    async function initDashboard() {
         loadSettings();
-        await loadDevices();
+        await loadDevices(); // This will now use user-specific devices
         await loadAndRenderSensorData();
-        setupEventListeners();
+        setupEventListeners(); // Original event listeners
         startAutoRefresh();
+        setInterval(checkNewMessages, 3000);
     }
 
-    // --- load devices ---
+    // --- Login and Session Management ---
+    async function checkLoginState() {
+        const token = localStorage.getItem('sessionToken');
+        const userDataString = localStorage.getItem('userData');
 
+        if (token && userDataString) {
+            currentUser = JSON.parse(userDataString);
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('registrationSection').style.display = 'none';
+            document.getElementById('dashboardSection').style.display = 'block';
+            await initDashboard();
+        } else {
+            showLoginForm(); // Default to login form
+            document.getElementById('dashboardSection').style.display = 'none';
+            currentUser = null;
+        }
+    }
+
+    function showLoginForm() {
+        document.getElementById('loginSection').style.display = 'flex';
+        document.getElementById('registrationSection').style.display = 'none';
+    }
+
+    function showRegistrationForm() {
+        document.getElementById('loginSection').style.display = 'none';
+        document.getElementById('registrationSection').style.display = 'flex';
+    }
+
+
+    document.addEventListener('DOMContentLoaded', () => {
+        checkLoginState();
+
+        const loginForm = document.getElementById('loginForm');
+        const registrationForm = document.getElementById('registrationForm');
+        const switchToRegisterLink = document.getElementById('switchToRegister');
+        const switchToLoginLink = document.getElementById('switchToLogin');
+
+        if (switchToRegisterLink) {
+            switchToRegisterLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                showRegistrationForm();
+            });
+        }
+
+        if (switchToLoginLink) {
+            switchToLoginLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                showLoginForm();
+            });
+        }
+
+
+        if (loginForm) {
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const username = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
+                const loginError = document.getElementById('loginError');
+                loginError.style.display = 'none';
+
+                try {
+                    const response = await fetch('/api/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.success) {
+                            localStorage.setItem('sessionToken', data.token);
+                            localStorage.setItem('userData', JSON.stringify({ username: data.username, devices: data.devices }));
+                            await checkLoginState();
+                        } else {
+                            loginError.textContent = data.message || 'Login failed.';
+                            loginError.style.display = 'block';
+                        }
+                    } else {
+                        const errorData = await response.json();
+                        loginError.textContent = errorData.message || `Error: ${response.status}`;
+                        loginError.style.display = 'block';
+                    }
+                } catch (error) {
+                    console.error('Login request failed:', error);
+                    loginError.textContent = 'Login request failed. Check console.';
+                    loginError.style.display = 'block';
+                }
+            });
+        }
+        
+        if (registrationForm) {
+            registrationForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const username = document.getElementById('regUsername').value;
+                const password = document.getElementById('regPassword').value;
+                const confirmPassword = document.getElementById('regConfirmPassword').value;
+                const registrationError = document.getElementById('registrationError');
+                registrationError.style.display = 'none';
+
+                if (password !== confirmPassword) {
+                    registrationError.textContent = 'Passwords do not match.';
+                    registrationError.style.display = 'block';
+                    return;
+                }
+
+                // Basic password policy (example: at least 6 characters)
+                if (password.length < 6) {
+                    registrationError.textContent = 'Password must be at least 6 characters long.';
+                    registrationError.style.display = 'block';
+                    return;
+                }
+                // Basic username policy (example: at least 3 characters)
+                if (username.length < 3) {
+                    registrationError.textContent = 'Username must be at least 3 characters long.';
+                    registrationError.style.display = 'block';
+                    return;
+                }
+
+
+                try {
+                    const response = await fetch('/api/register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok && data.success) {
+                        alert('Registration successful! Please login.'); // Or show a success message
+                        showLoginForm(); // Switch to login form
+                        document.getElementById('registrationForm').reset(); // Reset registration form
+                    } else {
+                        registrationError.textContent = data.message || 'Registration failed.';
+                        registrationError.style.display = 'block';
+                    }
+                } catch (error) {
+                    console.error('Registration request failed:', error);
+                    registrationError.textContent = 'Registration request failed. Check console.';
+                    registrationError.style.display = 'block';
+                }
+            });
+        }
+
+        const logoutButton = document.getElementById('logoutButton');
+        if (logoutButton) {
+            logoutButton.addEventListener('click', () => {
+                localStorage.removeItem('sessionToken');
+                localStorage.removeItem('userData');
+                // Clear sensitive cached data if any
+                chartDataCache = [];
+                chartLastTimestamp = 0;
+                selectedDeviceId = null;
+                selectedSensorIds = [];
+                if (currentChart) {
+                    currentChart.destroy();
+                    currentChart = null;
+                }
+                // Reset UI elements that might hold old data
+                deviceSelect.innerHTML = '<option>Loading...</option>';
+                sensorSelect.innerHTML = '';
+
+                checkLoginState();
+            });
+        }
+    });
+
+    // --- load devices ---
     async function loadDevices() {
-        const res = await fetch('/api/device?limit=100');
-        const devices = await res.json();
+        const userDataString = localStorage.getItem('userData');
+        if (!userDataString) {
+            console.error("User data not found for loading devices.");
+            deviceSelect.innerHTML = '<option value="">--Login Required--</option>';
+            return;
+        }
+        const userData = JSON.parse(userDataString);
+        const allowedDeviceIds = userData.devices; // Expected: array of device_ids
+
+        if (!allowedDeviceIds || allowedDeviceIds.length === 0) {
+            deviceSelect.innerHTML = '<option value="">--No Devices Assigned--</option>';
+            selectedDeviceId = null; // Ensure selectedDeviceId is cleared
+            await loadSensors(null); // Clear sensors
+            await loadAndRenderSensorData(); // Clear chart
+            return;
+        }
+
+        const deviceIdsQueryParam = allowedDeviceIds.map(id => encodeURIComponent(id)).join(',');
+        // Fetch only the devices assigned to the user
+        const res = await fetch(`/api/device?device_ids=${deviceIdsQueryParam}&limit=${allowedDeviceIds.length}`);
+        if (!res.ok) {
+            console.error("Failed to load user devices:", await res.text());
+            deviceSelect.innerHTML = '<option value="">--Error Loading Devices--</option>';
+            return;
+        }
+        const userDevices = await res.json();
+
         // @ts-ignore
-        deviceSelect.innerHTML = '<option value="">--Please Select Device--</option>' + devices.map(function(d) {
+        deviceSelect.innerHTML = '<option value="">--Please Select Device--</option>' + userDevices.map(function(d) {
             return '<option value="' + d.device_id + '">' + d.device_name +'-'+d.device_type +'-'+d.device_id +'</option>';
         }).join('');
-        // if not empty
-        if (deviceSelect.children.length > 1){
-            // iter chidren
-            deviceid = localStorage.getItem('iot-dashboard-deviceId');
-            if (deviceid) {
-                const found = Array.from(deviceSelect.children).find(opt => opt.value === deviceid);
-                if (found) {
-                    // this is wrong, need to trigger 'change' event
-                    // wait DOM ready
-                    setTimeout(() => {
-                        deviceSelect.value = deviceid;
-                        selectedDeviceId = deviceid;
-                        deviceSelect.dispatchEvent(new Event('change', {bubbles: true}));
-                    },0);
-                } else {
-                    deviceSelect.selectedIndex = 0; // reset to default
-                    selectedDeviceId = null;
-                }
-            } else {
-                deviceSelect.selectedIndex = 0; // reset to default
-                selectedDeviceId = null;
-            }
+        
+        if (userDevices.length > 0) {
+            let lastSelectedDeviceId = localStorage.getItem('iot-dashboard-deviceId');
+            // Ensure the last selected device is in the allowed list
+            const isValidLastDevice = lastSelectedDeviceId && userDevices.some(d => d.device_id.toString() === lastSelectedDeviceId);
 
+            if (isValidLastDevice) {
+                deviceSelect.value = lastSelectedDeviceId;
+                selectedDeviceId = lastSelectedDeviceId;
+            } else {
+                deviceSelect.selectedIndex = 0; // Or prompt to select
+                selectedDeviceId = null;
+                localStorage.removeItem('iot-dashboard-deviceId'); // Clear invalid stored ID
+            }
+        } else {
+            deviceSelect.selectedIndex = 0;
+            selectedDeviceId = null;
+            localStorage.removeItem('iot-dashboard-deviceId');
+        }
+        // Trigger change to load sensors for the selected device (if any)
+        if (selectedDeviceId) {
+             deviceSelect.dispatchEvent(new Event('change', {bubbles: true}));
+        } else {
+            await loadSensors(null);
+            await loadAndRenderSensorData();
         }
     }
 
     // --- loading sensors ---
-
     async function loadSensors(deviceId) {
         if (!deviceId) {
             sensorSelect.innerHTML = '';
@@ -347,23 +647,18 @@
         sensorSelect.innerHTML = sensors.length ? sensors.map(function(s) {
             return '<option value="' + s.sensor_id + '">' + s.sensor_name + ' (' + (s.sensor_type || 'unknown') + '-' + s.sensor_id + ')</option>';
         }).join('') : '<option>No sensor</option>';
-        // if not empty
         if (sensorSelect.children.length > 0) {
-            // this is an array obj
             const sensorIds = localStorage.getItem('iot-dashboard-sensorId');
-
             if (sensorIds) {
-                // wait DOM ready
                 setTimeout(() => {
                     const ids = sensorIds.split(',').map(id => id.trim());
-
                     Array.from(sensorSelect.options).forEach(opt => {
                         opt.selected = ids.includes(opt.value);
                     })
                     sensorSelect.dispatchEvent(new Event('change', {bubbles: true}));
                 },0);
             } else {
-                sensorSelect.selectedIndex = -1; // reset to default
+                sensorSelect.selectedIndex = -1;
                 selectedSensorIds = [];
             }
         } else {
@@ -393,33 +688,28 @@
             default: start = now - 3600;
         }
 
-        // load all data save to cache
         chartDataCache = [];
         chartLastTimestamp = 0;
 
-        // load all exist sensor
         await Promise.all(selectedSensorIds.map(async (sensorId) => {
             const resp = await fetch(`/api/sensor_data?sensor_id=${sensorId}&start=${start}&end=${now}&limit=1000`);
             const data = await resp.json();
             if (!data.length) return;
-            // get all fields from first data
             const allFields = Object.keys(JSON.parse(data[0].data));
             allFields.forEach(field => {
                 const points = data.map(d => ({
                     x: d.timestamp * 1000,
                     y: parseFloat(JSON.parse(d.data)[field])
-                })).reverse(); // time order
+                })).reverse();
                 chartDataCache.push({
                     sensorId,
                     field,
                     points
                 });
             });
-            // record last timestamp
             chartLastTimestamp = Math.max(chartLastTimestamp, ...data.map(d => d.timestamp * 1000));
         }));
 
-        // compose datasets
         const datasets = chartDataCache.map((d,i) => ({
             label: `${d.field} (Sensor:${d.sensorId})`,
             data: d.points,
@@ -434,17 +724,14 @@
         updating = false;
     }
 
-    // auto refresh
     async function fetchNewSensorData() {
         if (!selectedSensorIds.length || !chartLastTimestamp) return;
         const now = Math.floor(Date.now() / 1000);
         let hasUpdate = false;
-        // add new data to chartDataCache, depending on cache sensorId and field
         await Promise.all(chartDataCache.map(async (d) => {
             const resp = await fetch(`/api/sensor_data?sensor_id=${d.sensorId}&start=${Math.floor(chartLastTimestamp/1000)+1}&end=${now}&limit=100`);
             const data = await resp.json();
             if (!data.length) return;
-            // new data only pull field
             const newPoints = [];
             data.forEach(row => {
                 const val = JSON.parse(row.data)[d.field];
@@ -462,9 +749,7 @@
         }));
 
         if (hasUpdate) {
-            // update lastest timestamp
             chartLastTimestamp = Math.max(...chartDataCache.map(d => d.points.length ? d.points[d.points.length-1].x : 0));
-            // re-compose datasets
             const datasets = chartDataCache.map((d,i) => ({
                 label:`${d.field} (Sensor:${d.sensorId})`,
                 data: d.points,
@@ -478,9 +763,7 @@
         }
     }
 
-    // --- render Chart.js chart ---
     function renderChart(datasets) {
-        // destory chart
         if (currentChart) {
             currentChart.destroy();
             currentChart = null;
@@ -493,18 +776,12 @@
             year: 'month'
         };
 
-        // calculate fit line data
         let fitLines = [];
         datasets.forEach((ds, i) => {
             if (ds.data.length > 1) {
                 const {k, b} = linearFit(ds.data);
-                // get x range
                 const x0 = ds.data[0].x;
                 const x1 = ds.data[ds.data.length-1].x;
-                // calculate X
-                const y0 = k*0 + b;
-                const y1 = k*(ds.data.length-1) + b;
-                // use X to fit
                 const fitData = [
                     {x: x0, y: k*0 + b},
                     {x: x1, y: k*(ds.data.length-1) + b}
@@ -530,7 +807,6 @@
             }
         });
 
-        // combine data set
         let allDatasets = [...datasets];
         fitLines.forEach(fit => {
             allDatasets.push({
@@ -550,11 +826,8 @@
             });
         });
 
-
-        // fit line only for line / bar / radar charts
         let chartType = selectedChartType;
         if (chartType === 'pie' || chartType === 'doughnut') {
-            // don't add fit line
             const first = datasets[0];
             if (!first) return;
             currentChart = new Chart(chartCtx, {
@@ -591,14 +864,12 @@
                         legend: {
                             display: true,
                             labels: {
-                                usePointStyle: true // fix legend click issue
+                                usePointStyle: true
                             },
                             onClick: function(e, legendItem, legend) {
-                                // fix legend click position issue
                                 const index = legendItem.datasetIndex;
                                 const ci = legend.chart;
                                 const meta = ci.getDatasetMeta(index);
-                                // only hide dataset exclude fit line
                                 if (meta.hidden === null) {
                                     meta.hidden = !ci.data.datasets[index].hidden;
                                 } else {
@@ -628,7 +899,6 @@
                 plugins: [{
                     id: 'fitFormulaLabel',
                     afterDraw(chart) {
-                        // show fit equation
                         const ctx = chart.ctx;
                         let y = 30;
                         chart.data.datasets.forEach((ds, i) => {
@@ -649,7 +919,6 @@
         showChartStats(datasets, fitLines);
     }
 
-    // --- chart statistics and trend analysis ---
     function showChartStats(datasets, fitLines) {
         let statsHtml = '';
         if (!datasets || !datasets.length) {
@@ -665,7 +934,6 @@
             const avg = (values.reduce((a,b)=>a+b,0)/values.length).toFixed(2);
             const max = Math.max(...values).toFixed(2);
             const min = Math.min(...values).toFixed(2);
-            // Simple trend detection
             const trend = values[0] < values[values.length-1] ? 'Increasing' : (values[0] > values[values.length-1] ? 'Decreasing' : 'Stable');
             statsHtml += `<tr>
                 <td>${ds.label}</td>
@@ -677,7 +945,6 @@
         });
         statsHtml += `</table>`;
 
-        // Fitted Line Display
         if (fitLines && fitLines.length) {
             statsHtml += `<div style="margin-top:10px;">`;
             fitLines.forEach(fit => {
@@ -687,7 +954,6 @@
         }
         statsHtml += `</div>`;
 
-        // insert or replace
         let statsDiv = document.getElementById('chartStats');
         if (!statsDiv) {
             statsDiv = document.createElement('div');
@@ -697,7 +963,6 @@
         statsDiv.outerHTML = statsHtml;
     }
 
-    // simple linear regression
     function linearFit(points) {
         const n = points.length;
         let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
@@ -735,10 +1000,8 @@
               <p>Staus: <strong>${w.state || 'unknown'}</strong></p>
               <button class="toggleBtn">${w.state === 'on' ? 'OFF' : 'ON'}</button>
             `;
-            // delete button
             div.querySelector('.closeBtn').onclick = () => {
                 widgets = widgets.filter(x => x.control_id !== w.control_id);
-                // remove from database
                 fetch('/api/controls?control_id=' + w.control_id, {
                     method: 'DELETE'
                 }).then(resp => {
@@ -750,9 +1013,7 @@
                 });
                 renderWidgets();
             };
-            // on/off button
             div.querySelector('.toggleBtn').onclick = async () => {
-
                 const newState = w.state === 'on' ? 'off' : 'on';
 
                 fetch('/api/messages', {
@@ -765,7 +1026,6 @@
                         from_source: 'web'
                     })
                 });
-
 
                 const resp = await fetch('/api/controls?control_id=' + w.control_id, {
                     method: 'PUT',
@@ -783,12 +1043,10 @@
         });
     }
 
-    // --- events listening ---
     function setupEventListeners() {
         deviceSelect.addEventListener('change', async () => {
             console.log('Device changed:', deviceSelect.value);
             selectedDeviceId = deviceSelect.value;
-            // this need to set before load sensors
             sensorSelect.selectedIndex = -1;
             await loadSensors(selectedDeviceId);
             await loadWidgets();
@@ -814,8 +1072,7 @@
                 btn.classList.add('active');
                 selectedTimeRange = btn.dataset.range;
                 localStorage.setItem('iot-dashboard-timeRange', selectedTimeRange);
-                // saveSettingsToLocal();
-                loadAndRenderSensorData();  // this is importance
+                loadAndRenderSensorData();
             });
         });
 
@@ -825,10 +1082,8 @@
                 currentChart = null;
             }
             selectedChartType = chartTypeSelect.value;
-            // saveSettingsToLocal();
-            // no need to fetch data again, just re-render chart with cached data
             const datasets = chartDataCache.map((d,i) => ({
-                label: `${d.field} (Sensor:${d.sensorId})`, // FIX: use correct label
+                label: `${d.field} (Sensor:${d.sensorId})`,
                 data: d.points,
                 borderColor: getLineColor(`${d.field}-${d.sensorId}`, i),
                 backgroundColor: 'transparent',
@@ -843,7 +1098,6 @@
             alert('Setting saved to localStorage');
         });
 
-        // init settings panel
         defaultTimeRangeSelect.value = selectedTimeRange;
         defaultChartTypeSelect.value = selectedChartType;
 
@@ -852,19 +1106,16 @@
             timeRangeButtons.querySelectorAll('button').forEach(b => b.classList.remove('active'));
             const btn = timeRangeButtons.querySelector(`button[data-range="${selectedTimeRange}"]`);
             if (btn) btn.classList.add('active');
-            // saveSettingsToLocal();
             loadAndRenderSensorData();
         });
 
         defaultChartTypeSelect.addEventListener('change', (e) => {
             selectedChartType = e.target.value;
             chartTypeSelect.value = selectedChartType;
-            // saveSettingsToLocal();
             loadAndRenderSensorData();
         });
 
         addWidgetBtn.addEventListener('click', async () => {
-            // simple prompt for control_name and control_type
             if (!selectedDeviceId) {
                 return alert('Please select a device sensor first');
             }
@@ -885,17 +1136,10 @@
             }
         });
 
-
-        // auto refresh chart
-
         autoRefreshCheckbox.addEventListener('change', startAutoRefresh);
         autoRefreshIntervalInput.addEventListener('change', startAutoRefresh);
 
-
-        // Add Test buttons
         document.getElementById('btnAddDevice').addEventListener('click', addTestDevice);
-
-
 
         document.getElementById('btnAddControl').addEventListener('click', async () => {
             if (!lastDeviceId) {
@@ -925,10 +1169,7 @@
 
         document.getElementById('btnAddAll').addEventListener('click', addTestAll);
 
-        // Test Delete button logic
         document.getElementById('btnTestDelete').addEventListener('click', async () => {
-
-            // delete selected device and related data
             const radios = document.querySelectorAll('input[name="testDeviceRadio"]:checked');
             const deviceId = radios.length ? radios[0].value : null;
             if (!deviceId) {
@@ -938,7 +1179,6 @@
             if (!confirm(`Delete device ${deviceId} and all related data?`)) return;
 
             try {
-                // 1. delete all controls data belong the device_id
                 await fetch(`/api/controls?device_id=${deviceId}`, { method: 'GET' })
                     .then(res => res.json())
                     .then(async controls => {
@@ -947,15 +1187,12 @@
                         }
                     });
 
-                // 2. delete all sensors belong to device_id
                 await fetch(`/api/sensors?device_id=${deviceId}&limit=100`, { method: 'GET' })
                     .then(res => res.json())
                     .then(async sensors => {
                         for (const sensor of sensors) {
-                            // delete sensor_data
                             await fetch(`/api/sensor_data?sensor_id=${sensor.sensor_id}`, { method: 'GET' })
                                 .then(res => {
-                                    // show the return  from server
                                     if (res.ok) {
                                         return res.json();
                                     } else {
@@ -963,15 +1200,12 @@
                                     }
 
                                 });
-                            // delete sensor
                             await fetch(`/api/sensors?sensor_id=${sensor.sensor_id}`, { method: 'DELETE' });
                         }
                     });
 
-                // 3. delete device itself
                 await fetch(`/api/device?device_id=${deviceId}`, { method: 'DELETE' });
 
-                // 4. clean localStorage
                 localStorage.removeItem('lastDeviceId');
                 localStorage.removeItem('lastControlId');
                 localStorage.removeItem('lastSensorId');
@@ -1089,7 +1323,6 @@
         return data.data_id;
     }
 
-    // tests compose, add device, control, sensor and sensor data
     async function addTestAll() {
         const deviceId = await addTestDevice();
         if (!deviceId) return;
@@ -1101,7 +1334,6 @@
         alert('Add datas successfully!');
     }
 
-    // --- local storage settings ---
     function saveSettingsToLocal() {
         localStorage.setItem('iot-dashboard-timeRange', selectedTimeRange);
         localStorage.setItem('iot-dashboard-chartType', selectedChartType);
@@ -1115,31 +1347,25 @@
 
     }
 
-    // add variable to record last processed message timestamp
     let lastMessageTimestamp = Math.floor(Date.now() / 1000);
 
-    // set interval to check for new messages every 5 seconds
-    setInterval(checkNewMessages, 5000);
+
 
     async function checkNewMessages() {
         const resp = await fetch(`/api/messages?after=${lastMessageTimestamp}`);
         const messages = await resp.json();
         if (!messages.length) return;
 
-        // time order messages
         messages.sort((a, b) => a.created_at - b.created_at);
 
         for (const msg of messages) {
             lastMessageTimestamp = Math.max(lastMessageTimestamp, msg.created_at);
-            if (msg.from_source.startsWith('web')) continue; // skip by web(self) source
-            // depending on your widget structure, you may need to adjust this
+            if (msg.from_source.startsWith('web')) continue;
             updateWidgetState(msg.control_id, msg.state);
         }
     }
 
-    // widget state update function
     function updateWidgetState(control_id, state) {
-        // process widgets to find the one with control_id
         const widget = widgets.find(w => w.control_id === control_id);
         if (widget) {
             widget.state = state;
@@ -1147,22 +1373,13 @@
         }
     }
 
-    // when click on sensor
     function reloadTimeRangeBtn(){
         timeRangeButtons.querySelectorAll('button').forEach(b => b.classList.remove('active'));
         const activeBtn = timeRangeButtons.querySelector(`button[data-range="${selectedTimeRange}"]`);
         if (activeBtn) activeBtn.classList.add('active');
     }
-    function reloadDevice(){
 
-    }
-    function reloadSensor(){
-
-    }
-
-    // --- Test Tab Device/Sensor List ---
     async function loadTestDeviceList() {
-        // get all device whose device_name contains "test"
         const res = await fetch('/api/device?device_name=test&limit=100');
         const devices = await res.json();
         const testDeviceList = document.getElementById('testDeviceList');
@@ -1173,7 +1390,6 @@
             document.getElementById('lastDeviceInfo').textContent = 'No lastDeviceId';
             return;
         }
-        // single-select list
         devices.forEach((d, idx) => {
             const radio = document.createElement('input');
             radio.type = 'radio';
@@ -1191,7 +1407,6 @@
             label.style.marginRight = '15px';
             testDeviceList.appendChild(label);
         });
-        // default select first
         const firstId = devices[0].device_id;
         localStorage.setItem('lastDeviceId', firstId);
         document.getElementById('lastDeviceInfo').textContent = `lastDeviceId: ${firstId}`;
@@ -1226,12 +1441,8 @@
             label.style.marginRight = '15px';
             testSensorList.appendChild(label);
         });
-        // default select first
         localStorage.setItem('lastSensorId', sensors[0].sensor_id);
     }
-
-    // --- initial ---
-    init();
 
 </script>
 </body>

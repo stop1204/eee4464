@@ -3,24 +3,33 @@ import { renderHtml } from './resp.js';
 var __defProp = Object.defineProperty;
 var __name = (target: (content: any) => string, value: string) => __defProp(target, "name", { value, configurable: true });
 
-
 __name(renderHtml, "renderHtml");
+
+// Helper for SHA-256 Hashing
+async function sha256(message: string): Promise<string> {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+__name(sha256, "sha256");
 
 // src/index.ts
 var index_default = {
-  async fetch(request: { url: string | URL; }, env: { DB: any; }) {
+  async fetch(request: Request, env: { DB: D1Database; }, ctx: ExecutionContext) {
     const url = new URL(request.url);
     const { pathname, searchParams } = url;
     const db = env.DB;
 
+    if (pathname.startsWith('/api/login')) return handleLogin(request, db);
+    if (pathname.startsWith('/api/register')) return handleRegister(request, db);
     if (pathname.startsWith('/api/device')) return handleDevice(request, db, searchParams);
     if (pathname.startsWith('/api/sensors')) return handleSensors(request, db, searchParams);
     if (pathname.startsWith('/api/sensor_data')) return handleSensorData(request, db, searchParams);
     if (pathname.startsWith('/api/controls')) return handleControls(request, db, searchParams);
     if (pathname.startsWith('/api/messages')) return handleMessages(request, db, searchParams);
 
-
-    return new Response( renderHtml(), {
+    return new Response(renderHtml(), {
       headers: {
         "content-type": "text/html"
       }
@@ -31,31 +40,144 @@ export {
   index_default as default
 };
 
+async function handleRegister(request: Request, db: D1Database) {
+  if (request.method !== 'POST') {
+    return text('Method Not Allowed', 405);
+  }
+
+  try {
+    const { username, password } = await request.json();
+
+    if (!username || !password) {
+      return json({ success: false, message: 'Username and password are required.' }, 400);
+    }
+
+    // Basic validation (can be expanded)
+    if (username.length < 3) {
+        return json({ success: false, message: 'Username must be at least 3 characters long.' }, 400);
+    }
+    if (password.length < 6) {
+        return json({ success: false, message: 'Password must be at least 6 characters long.' }, 400);
+    }
+
+    // Check if username already exists
+    const existingUser = await db.prepare('SELECT user_id FROM users WHERE username = ?').bind(username).first();
+    if (existingUser) {
+      return json({ success: false, message: 'Username already taken.' }, 409); // 409 Conflict
+    }
+
+    const passwordHash = await sha256(password);
+    const defaultDevices = '[]'; // New users start with no devices
+
+    const result = await db.prepare(
+      'INSERT INTO users (username, password_hash, devices) VALUES (?, ?, ?)'
+    ).bind(username, passwordHash, defaultDevices).run();
+
+    if (result.success) {
+      return json({ success: true, message: 'User registered successfully.' });
+    } else {
+      console.error('Registration DB error:', result.error);
+      return json({ success: false, message: 'Registration failed. Please try again.' }, 500);
+    }
+
+  } catch (error) {
+    console.error('Registration error:', error);
+    // @ts-ignore
+    if (error.message && error.message.includes("UNIQUE constraint failed: users.username")) {
+        return json({ success: false, message: 'Username already taken.' }, 409);
+    }
+    return json({ success: false, message: 'An internal error occurred during registration.' }, 500);
+  }
+}
+__name(handleRegister, "handleRegister");
+
+async function handleLogin(request: Request, db: D1Database) {
+  if (request.method !== 'POST') {
+    return text('Method Not Allowed', 405);
+  }
+
+  try {
+    const { username, password } = await request.json();
+
+    if (!username || !password) {
+      return json({ success: false, message: 'Username and password are required.' }, 400);
+    }
+
+    const userQuery = await db.prepare('SELECT user_id, username, password_hash, devices FROM users WHERE username = ?').bind(username).first();
+
+    if (!userQuery) {
+      return json({ success: false, message: 'Invalid username or password.' }, 401);
+    }
+    
+    const storedHash = userQuery.password_hash as string;
+    const userDevices = userQuery.devices as string;
+
+    const inputPasswordHash = await sha256(password);
+
+    if (inputPasswordHash !== storedHash) {
+      return json({ success: false, message: 'Invalid username or password.' }, 401);
+    }
+
+    const token = `session_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+    
+    let parsedDevices = [];
+    try {
+        parsedDevices = JSON.parse(userDevices);
+        if (!Array.isArray(parsedDevices)) {
+            console.error("User devices field is not a valid JSON array:", userDevices);
+            parsedDevices = [];
+        }
+    } catch (e) {
+        console.error("Failed to parse user devices JSON:", e, userDevices);
+        parsedDevices = [];
+    }
+
+    return json({ success: true, token, username: userQuery.username, devices: parsedDevices });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    return json({ success: false, message: 'An internal error occurred.' }, 500);
+  }
+}
+__name(handleLogin, "handleLogin");
+
 // @ts-ignore
 async function handleDevice(request, db, searchParams) {
   if (request.method === 'GET') {
-    // allow filter by device_name, device_type, device_id
     const device_name = searchParams.get('device_name');
     const device_type = searchParams.get('device_type');
-    const device_id = searchParams.get('device_id');
+    const device_id_single = searchParams.get('device_id');
+    const device_ids_plural = searchParams.get('device_ids');
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
     const offset = parseInt(searchParams.get('offset') || '0');
 
     let query = 'SELECT * FROM device WHERE 1=1';
-    let params = [];
+    let params: any[] = [];
 
-    if (device_name) {
-      query += ' AND device_name LIKE ?';
-      params.push(`%${device_name}%`);
+    if (device_ids_plural) {
+        const ids = device_ids_plural.split(',')
+            .map(id => id.trim())
+            .filter(id => id !== '');
+        if (ids.length > 0) {
+            query += ` AND device_id IN (${ids.map(() => '?').join(',')})`;
+            params.push(...ids);
+        } else {
+            return json([]);
+        }
+    } else if (device_id_single) {
+        query += ' AND device_id = ?';
+        params.push(device_id_single);
+    } else {
+        if (device_name) {
+            query += ' AND device_name LIKE ?';
+            params.push(`%${device_name}%`);
+        }
+        if (device_type) {
+            query += ' AND device_type = ?';
+            params.push(device_type);
+        }
     }
-    if (device_type) {
-      query += ' AND device_type = ?';
-      params.push(device_type);
-    }
-    if (device_id) {
-      query += ' AND device_id = ?';
-      params.push(device_id);
-    }
+
     query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
     params.push(limit, offset);
 
@@ -64,7 +186,6 @@ async function handleDevice(request, db, searchParams) {
   }
 
   if (request.method === 'POST') {
-    // new device
     const { device_id, device_name, device_type } = await request.json();
     if (!device_name) return new Response('Missing device_name', { status: 400 });
 
@@ -82,8 +203,6 @@ async function handleDevice(request, db, searchParams) {
   }
 
   if (request.method === 'PUT') {
-
-    // update device, need to specify device_id in query params (?device_id=xxx)
     const device_id = searchParams.get('device_id');
     if (!device_id) return new Response('Missing device_id', { status: 400 });
 
@@ -97,7 +216,6 @@ async function handleDevice(request, db, searchParams) {
   }
 
   if (request.method === 'DELETE') {
-    // delete device, need to specify device_id in query params (?device_id=xxx)
     const device_id = searchParams.get('device_id');
     if (!device_id) return new Response('Missing device_id', { status: 400 });
 
@@ -108,11 +226,9 @@ async function handleDevice(request, db, searchParams) {
   return new Response('Method Not Allowed', { status: 405 });
 }
 
-
 // @ts-ignore
 async function handleSensors(request, db, searchParams) {
   if (request.method === 'GET') {
-    // allow filter by device_id, sensor_type
     const device_id = searchParams.get('device_id');
     const sensor_type = searchParams.get('sensor_type');
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
@@ -137,7 +253,7 @@ async function handleSensors(request, db, searchParams) {
   }
 
   if (request.method === 'POST') {
-    const { sensor_id,device_id, sensor_type, sensor_name } = await request.json();
+    const { sensor_id, device_id, sensor_type, sensor_name } = await request.json();
     if (!device_id || !sensor_type) return text('Missing device_id or sensor_type', 400);
 
     let insert;
@@ -147,7 +263,6 @@ async function handleSensors(request, db, searchParams) {
         VALUES (?, ?, ?, ?, strftime('%s','now'))
       `).bind(sensor_id, device_id, sensor_type, sensor_name).run();
     } else {
-      // if sensor_id is not provided, it will be auto-incremented
       insert = await db.prepare(`
         INSERT INTO sensors (device_id, sensor_type, sensor_name, created_at)
         VALUES (?, ?, ?, strftime('%s','now'))
@@ -181,12 +296,12 @@ async function handleSensors(request, db, searchParams) {
     return json({ deleted: del.changes });
   }
 }
+
 // @ts-ignore
 async function handleSensorData(request, db, searchParams) {
   if (request.method === 'GET') {
-    // allow filter by sensor_id, start, end, limit, offset
     const sensor_id = searchParams.get('sensor_id');
-    const start = searchParams.get('start'); // UNIX时间戳
+    const start = searchParams.get('start');
     const end = searchParams.get('end');
     const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 200);
     const offset = parseInt(searchParams.get('offset') || '0');
@@ -212,26 +327,14 @@ async function handleSensorData(request, db, searchParams) {
   }
 
   if (request.method === 'POST') {
-    /*
-      upload example：
-      {
-        sensor_id: 123,
-        timestamp: 1684555200,
-        data: { temperature: 24.5, humidity: 60, voltage: 3.3 }
-      }
-    */
     const body = await request.json();
     const { sensor_id, timestamp, data } = body;
 
     if (!sensor_id || !data) return text('Missing sensor_id or timestamp or data', 400);
 
-    // if timestamp is not provided use current time
-
     let insert;
     let data_json;
-    // data from esp32: "{\"moisture\":\"2928\"}", need to parse it
-    // replace '"{' and '}"' with '{' and '}'
-    // replace '\"' with '"'
+
     if (typeof data === 'string') {
       try {
         data_json = JSON.parse(data.replace(/\"{/g, '{').replace(/}\"/g, '}').replace(/\\"/g, '"'));
@@ -247,7 +350,7 @@ async function handleSensorData(request, db, searchParams) {
         INSERT INTO sensor_data (sensor_id, data, timestamp)
         VALUES (?,?,strftime('%s','now')
         )`).bind(sensor_id, JSON.stringify(data_json)).run();
-    }else{
+    } else {
       insert = await db.prepare(`
         INSERT INTO sensor_data (sensor_id, timestamp, data)
         VALUES (?, ?, ?)
@@ -257,18 +360,15 @@ async function handleSensorData(request, db, searchParams) {
     return json({ data_id: insert.meta.last_row_id });
   }
 
-
-  // put and delete methods can be implemented as needed, generally POST is used for uploading data, and GET is used for querying
-  if (request.method === 'Delete') {
-    // delete sensor data, need to specify sensor_id and timestamp in query params (?sensor_id=xxx&timestamp=xxx)
+  if (request.method === 'DELETE') {
     const sensor_id = searchParams.get('sensor_id');
-    // const timestamp = searchParams.get('timestamp');
     if (!sensor_id) return text('Missing sensor_id or timestamp', 400);
 
     const del = await db.prepare('DELETE FROM sensor_data WHERE sensor_id = ?').bind(sensor_id).run();
     return json({ deleted: del.changes });
   }
 }
+
 // @ts-ignore
 async function handleControls(request, db, searchParams) {
   if (request.method === 'GET') {
@@ -280,22 +380,13 @@ async function handleControls(request, db, searchParams) {
   }
 
   if (request.method === 'POST') {
-    /*
-      example：
-      {
-        device_id: 1,
-        control_type: "button",
-        control_name: "light_switch",
-        state: "on"
-      }
-    */
-    const { device_id, control_id , control_type, control_name, state } = await request.json();
+    const { device_id, control_id, control_type, control_name, state } = await request.json();
     if (!device_id || !control_id || !control_type) return text('Missing device_id or control_type', 400);
 
     const insert = await db.prepare(`
-      INSERT INTO controls (device_id, control_type, control_name, state, updated_at,control_id)
-      VALUES (?, ?, ?, ?, strftime('%s','now'),?)
-    `).bind(device_id, control_type, control_name, state,control_id).run();
+      INSERT INTO controls (device_id, control_type, control_name, state, updated_at, control_id)
+      VALUES (?, ?, ?, ?, strftime('%s','now'), ?)
+    `).bind(device_id, control_type, control_name, state, control_id).run();
 
     return json({ control_id: insert.meta.last_row_id });
   }
@@ -326,7 +417,6 @@ async function handleControls(request, db, searchParams) {
 // @ts-ignore
 async function handleMessages(request, db, searchParams) {
   if (request.method === 'GET') {
-    // pull messages after a certain timestamp, default 10
     const after = Number(searchParams.get('after')) || 0;
     const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 20);
 
@@ -338,13 +428,12 @@ async function handleMessages(request, db, searchParams) {
   }
 
   if (request.method === 'POST') {
-    // write a message
     const body = await request.json();
     const { control_id, state, device_id, from_source } = body;
     if (!control_id || !state || !device_id || !from_source) {
       return text('Missing fields', 400);
     }
-    const created_at = Math.floor(Date.now() / 1000); // current timestamp
+    const created_at = Math.floor(Date.now() / 1000);
     const insert = await db.prepare(`
       INSERT INTO message (control_id, state, device_id, from_source, created_at)
       VALUES (?, ?, ?, ?, ?)
@@ -355,11 +444,15 @@ async function handleMessages(request, db, searchParams) {
 
   return text('Method Not Allowed', 405);
 }
+
 // @ts-ignore
-function json(obj) {
-  return new Response(JSON.stringify(obj), { headers: { 'Content-Type': 'application/json' } });
+function json(obj: any, status = 200) {
+  return new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
 }
+__name(json, "json");
+
 // @ts-ignore
-function text(msg, status = 200) {
+function text(msg: string, status = 200) {
   return new Response(msg, { status, headers: { 'Content-Type': 'text/plain' } });
 }
+__name(text, "text");

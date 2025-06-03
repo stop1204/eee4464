@@ -3,4 +3,4 @@
 
 # run wrangler dev server
 run:
-	wrangler dev --remote
+	npx wrangler dev --remote
