@@ -417,10 +417,11 @@
 
     // --- init ---
     async function initDashboard() {
+            console.log('Initializing dashboard...');
         loadSettings();
+        setupEventListeners(); // Original event listeners  this should be called after login and brefore loading devices
         await loadDevices(); // This will now use user-specific devices
-        await loadAndRenderSensorData();
-        setupEventListeners(); // Original event listeners
+
         startAutoRefresh();
         startMessageChecker(); // Start message checker after login
     }
@@ -609,6 +610,7 @@
             selectedDeviceId = null; // Ensure selectedDeviceId is cleared
             await loadSensors(null); // Clear sensors
             await loadAndRenderSensorData(); // Clear chart
+
             return;
         }
 
@@ -646,7 +648,9 @@
             localStorage.removeItem('iot-dashboard-deviceId');
         }
         // Trigger change to load sensors for the selected device (if any)
+        console.log("Loaded user devices:", userDevices);
         if (selectedDeviceId) {
+             console.log("Selected device ID:", selectedDeviceId);
              deviceSelect.dispatchEvent(new Event('change', {bubbles: true}));
         } else {
             await loadSensors(null);
@@ -665,6 +669,7 @@
         sensorSelect.innerHTML = sensors.length ? sensors.map(function(s) {
             return '<option value="' + s.sensor_id + '">' + s.sensor_name + ' (' + (s.sensor_type || 'unknown') + '-' + s.sensor_id + ')</option>';
         }).join('') : '<option>No sensor</option>';
+        console.log("Loaded sensors for device:", deviceId, sensors);
         if (sensorSelect.children.length > 0) {
             const sensorIds = localStorage.getItem('iot-dashboard-sensorId');
             if (sensorIds) {
@@ -708,7 +713,13 @@
 
         chartDataCache = [];
         chartLastTimestamp = 0;
-
+        const validSensorIds = selectedSensorIds.filter(id => id.trim() !== "");
+        if (validSensorIds.length === 0) {
+            renderChart([]);
+            updating = false;
+            console.log("No valid sensors selected for data loading.");
+            return;
+        }
         await Promise.all(selectedSensorIds.map(async (sensorId) => {
             const resp = await fetch(`/api/sensor_data?sensor_id=${sensorId}&start=${start}&end=${now}&limit=1000`);
             const data = await resp.json();
@@ -1063,12 +1074,12 @@
 
     function setupEventListeners() {
         deviceSelect.addEventListener('change', async () => {
+            selectedSensorIds = [];
             console.log('Device changed:', deviceSelect.value);
             selectedDeviceId = deviceSelect.value;
             sensorSelect.selectedIndex = -1;
             await loadSensors(selectedDeviceId);
             await loadWidgets();
-            selectedSensorIds = [];
             if (localStorage.getItem('iot-dashboard-deviceId') !== selectedDeviceId) {
                 localStorage.setItem('iot-dashboard-deviceId', selectedDeviceId);
             }
@@ -1155,7 +1166,6 @@
         });
 
         autoRefreshCheckbox.addEventListener('change', startAutoRefresh);
-        autoRefreshIntervalInput.addEventListener('change', startAutoRefresh);
 
         document.getElementById('btnAddDevice').addEventListener('click', addTestDevice);
 
