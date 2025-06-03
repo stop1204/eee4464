@@ -285,7 +285,23 @@
             </select>
             <br/><br/>
             <button id="saveSettingsBtn">Save Settings</button>
+            
+            <!-- Password Change Section -->
+            <div style="margin-top: 30px; border-top: 1px solid #ddd; padding-top: 20px;">
+                <h3>Change Password</h3>
+                <div class="login-container" style="background: #f9f9f9; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+                    <form id="passwordChangeForm">
+                        <input type="password" id="currentPassword" placeholder="Current Password" required />
+                        <input type="password" id="newPassword" placeholder="New Password" required />
+                        <input type="password" id="confirmNewPassword" placeholder="Confirm New Password" required />
+                        <button type="submit" style="background-color: #0e838f;">Change Password</button>
+                        <p id="passwordChangeError" style="display:none; color:red; margin-top:10px;"></p>
+                        <p id="passwordChangeSuccess" style="display:none; color:green; margin-top:10px;"></p>
+                    </form>
+                </div>
+            </div>
         </section>
+
         <!-- Test Tab -->
         <section id="test" class="tab-content">
             <h2>Test Add Data</h2>
@@ -309,15 +325,15 @@
             
             <!-- New section for device ID management -->
             <div style="margin-top:20px; border-top:1px solid #ddd; padding-top:15px;">
-                <h3>Manage Your Device IDs</h3>
+                <h3>Manage Device IDs</h3>
                 <div style="margin-bottom:10px;">
                     <input type="text" id="deviceIdInput" placeholder="Device ID (3-20 digits)" 
                            style="padding:8px; border-radius:4px; width:200px; margin-right:10px;"
                            pattern="[0-9]{3,20}" title="Enter 3-20 digits only">
                     <br/>
                     <br/>
-                    <button id="btnAddDeviceToUser" style="background-color:#28a745; color:white; padding:8px 15px; border:none; border-radius:4px; cursor:pointer; margin-right:10px;">Add to My Account</button>
-                    <button id="btnRemoveDeviceFromUser" style="background-color:#dc3545; color:white; padding:8px 15px; border:none; border-radius:4px; cursor:pointer;">Remove from My Account</button>
+                    <button id="btnAddDeviceToUser" style="background-color:#28a745; color:white; padding:8px 15px; border:none; border-radius:4px; cursor:pointer; margin-right:10px;">Add to Account</button>
+                    <button id="btnRemoveDeviceFromUser" style="background-color:#dc3545; color:white; padding:8px 15px; border:none; border-radius:4px; cursor:pointer;">Remove from Account</button>
                 </div>
                 <div id="deviceManagementResult" style="margin-top:10px; font-weight:bold;"></div>
                 <div style="margin-top:10px;">
@@ -590,6 +606,71 @@
                 checkLoginState();
             });
         }
+
+        const passwordChangeForm = document.getElementById('passwordChangeForm');
+        
+        if (passwordChangeForm) {
+            passwordChangeForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const currentPassword = document.getElementById('currentPassword').value;
+                const newPassword = document.getElementById('newPassword').value;
+                const confirmNewPassword = document.getElementById('confirmNewPassword').value;
+                const passwordChangeError = document.getElementById('passwordChangeError');
+                const passwordChangeSuccess = document.getElementById('passwordChangeSuccess');
+                
+                // Reset messages
+                passwordChangeError.style.display = 'none';
+                passwordChangeSuccess.style.display = 'none';
+                
+                // Check if user is logged in
+                if (!currentUser || !currentUser.username) {
+                    passwordChangeError.textContent = 'You must be logged in to change your password.';
+                    passwordChangeError.style.display = 'block';
+                    return;
+                }
+                
+                // Check if passwords match
+                if (newPassword !== confirmNewPassword) {
+                    passwordChangeError.textContent = 'New passwords do not match.';
+                    passwordChangeError.style.display = 'block';
+                    return;
+                }
+                
+                // Basic password policy (at least 6 characters)
+                if (newPassword.length < 6) {
+                    passwordChangeError.textContent = 'New password must be at least 6 characters long.';
+                    passwordChangeError.style.display = 'block';
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/change-password', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            username: currentUser.username,
+                            currentPassword,
+                            newPassword
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok && data.success) {
+                        passwordChangeSuccess.textContent = data.message || 'Password changed successfully.';
+                        passwordChangeSuccess.style.display = 'block';
+                        document.getElementById('passwordChangeForm').reset();
+                    } else {
+                        passwordChangeError.textContent = data.message || 'Failed to change password.';
+                        passwordChangeError.style.display = 'block';
+                    }
+                } catch (error) {
+                    console.error('Password change request failed:', error);
+                    passwordChangeError.textContent = 'Password change request failed. Check console.';
+                    passwordChangeError.style.display = 'block';
+                }
+            });
+        }
     });
 
     // --- load devices ---
@@ -812,17 +893,17 @@
                 });
                 
                 if (newPoints.length) {
-                    console.log(`Adding ${newPoints.length} valid points for field ${field}`);
+                    // console.log(`Adding ${newPoints.length} valid points for field ${field}`);
                     entry.points = entry.points.concat(newPoints);
                     hasUpdate = true;
                 } else {
-                    console.log(`No valid points found for field ${field}`);
+                    // console.log(`No valid points found for field ${field}`);
                 }
             });
         }));
 
         if (hasUpdate) {
-            console.log(`Updating chart with new data...`);
+            // console.log(`Updating chart with new data...`);
             chartLastTimestamp = Math.max(...chartDataCache.map(d => d.points.length ? d.points[d.points.length-1].x : 0));
             const datasets = chartDataCache.map((d,i) => ({
                 label:`${d.field} (Sensor:${d.sensorId})`,
@@ -835,7 +916,7 @@
             }));
             renderChart(datasets);
         } else {
-            console.log(`No updates needed for chart.`);
+            // console.log(`No updates needed for chart.`);
         }
     }
 

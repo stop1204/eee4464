@@ -24,6 +24,7 @@ var index_default = {
 
     if (pathname.startsWith('/api/login')) return handleLogin(request, db);
     if (pathname.startsWith('/api/register')) return handleRegister(request, db);
+    if (pathname.startsWith('/api/change-password')) return handleChangePassword(request, db);
     if (pathname.startsWith( '/api/user/devices/add')) return handleAddDeviceToUser(request, db);
     if (pathname.startsWith( '/api/user/devices/remove')) return handleRemoveDeviceFromUser(request, db);
     if (pathname.startsWith('/api/device')) return handleDevice(request, db, searchParams);
@@ -291,6 +292,76 @@ async function handleLogin(request: Request, db: D1Database) {
 }
 // @ts-ignore
 __name(handleLogin, "handleLogin");
+
+async function handleChangePassword(request: Request, db: D1Database) {
+  if (request.method !== 'POST') {
+    return text('Method Not Allowed', 405);
+  }
+
+  try {
+    // @ts-ignore
+    const { username, currentPassword, newPassword } = await request.json();
+
+    if (!username || !currentPassword || !newPassword) {
+      return json({ 
+        success: false, 
+        message: 'Username, current password, and new password are required.' 
+      }, 400);
+    }
+
+    // Basic validation for new password
+    if (newPassword.length < 6) {
+      return json({ 
+        success: false, 
+        message: 'New password must be at least 6 characters long.' 
+      }, 400);
+    }
+
+    // Get user from database
+    const user = await db.prepare('SELECT user_id, password_hash FROM users WHERE username = ?')
+      .bind(username)
+      .first();
+
+    if (!user) {
+      return json({ success: false, message: 'User not found.' }, 404);
+    }
+
+    // Verify current password
+    const currentPasswordHash = await sha256(currentPassword);
+    if (currentPasswordHash !== user.password_hash) {
+      return json({ success: false, message: 'Current password is incorrect.' }, 401);
+    }
+
+    // Hash new password
+    const newPasswordHash = await sha256(newPassword);
+
+    // Update password in the database
+    const updateResult = await db.prepare('UPDATE users SET password_hash = ? WHERE username = ?')
+      .bind(newPasswordHash, username)
+      .run();
+
+    if (updateResult.success) {
+      return json({ 
+        success: true, 
+        message: 'Password changed successfully.' 
+      });
+    } else {
+      return json({ 
+        success: false, 
+        message: 'Failed to update password. Please try again.' 
+      }, 500);
+    }
+
+  } catch (error) {
+    console.error('Password change error:', error);
+    return json({ 
+      success: false, 
+      message: 'An internal error occurred while changing the password.' 
+    }, 500);
+  }
+}
+// @ts-ignore
+__name(handleChangePassword, "handleChangePassword");
 
 // @ts-ignore
 async function handleDevice(request, db, searchParams) {
