@@ -12,17 +12,20 @@ async function sha256(message: string): Promise<string> {
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
+// @ts-ignore
 __name(sha256, "sha256");
 
 // src/index.ts
 var index_default = {
-  async fetch(request: Request, env: { DB: D1Database; }, ctx: ExecutionContext) {
+  async fetch(request: Request, env: { DB: D1Database; }, _ctx: ExecutionContext) {
     const url = new URL(request.url);
     const { pathname, searchParams } = url;
     const db = env.DB;
 
     if (pathname.startsWith('/api/login')) return handleLogin(request, db);
     if (pathname.startsWith('/api/register')) return handleRegister(request, db);
+    if (pathname.startsWith( '/api/user/devices/add')) return handleAddDeviceToUser(request, db);
+    if (pathname.startsWith( '/api/user/devices/remove')) return handleRemoveDeviceFromUser(request, db);
     if (pathname.startsWith('/api/device')) return handleDevice(request, db, searchParams);
     if (pathname.startsWith('/api/sensors')) return handleSensors(request, db, searchParams);
     if (pathname.startsWith('/api/sensor_data')) return handleSensorData(request, db, searchParams);
@@ -40,12 +43,157 @@ export {
   index_default as default
 };
 
+// Add device to user's devices list
+async function handleAddDeviceToUser(request: Request, db: D1Database) {
+  if (request.method !== 'POST') {
+    return text('Method Not Allowed', 405);
+  }
+
+  try {
+    // @ts-ignore
+    const { username, device_id } = await request.json();
+    
+    if (!username || !device_id) {
+      return json({ success: false, message: 'Username and device_id are required' }, 400);
+    }
+    
+    // Validate device_id format (numeric 3-20 characters)
+    if (!/^\d{3,20}$/.test(device_id.toString())) {
+      return json({ success: false, message: 'Device ID must be 3-20 digits' }, 400);
+    }
+    
+    // Check if user exists
+    const user = await db.prepare('SELECT user_id, devices FROM users WHERE username = ?')
+      .bind(username)
+      .first();
+      
+    if (!user) {
+      return json({ success: false, message: 'User not found' }, 404);
+    }
+    
+    // Parse existing devices
+    let devices = [];
+    try {
+      devices = JSON.parse(user.devices as string || '[]');
+      if (!Array.isArray(devices)) {
+        devices = [];
+      }
+    } catch (e) {
+      console.error('Failed to parse devices:', e);
+      devices = [];
+    }
+    
+    // Check if device is already in the list
+    const deviceStr = device_id.toString();
+    if (devices.includes(deviceStr)) {
+      return json({ 
+        success: true, 
+        message: 'Device ID already assigned to this user', 
+        devices: devices 
+      });
+    }
+    
+    // Add device to the list
+    devices.push(deviceStr);
+    
+    // Update user's devices
+    const result = await db.prepare('UPDATE users SET devices = ? WHERE username = ?')
+      .bind(JSON.stringify(devices), username)
+      .run();
+      
+    if (result.success) {
+      return json({ 
+        success: true, 
+        message: 'Device added successfully', 
+        devices: devices 
+      });
+    } else {
+      return json({ success: false, message: 'Failed to update user devices' }, 500);
+    }
+  } catch (error) {
+    console.error('Error in handleAddDeviceToUser:', error);
+    return json({ success: false, message: 'An error occurred' }, 500);
+  }
+}
+
+// Remove device from user's devices list
+async function handleRemoveDeviceFromUser(request: Request, db: D1Database) {
+  if (request.method !== 'POST') {
+    return text('Method Not Allowed', 405);
+  }
+
+  try {
+    // @ts-ignore
+    const { username, device_id } = await request.json();
+    
+    if (!username || !device_id) {
+      return json({ success: false, message: 'Username and device_id are required' }, 400);
+    }
+    
+    // Check if user exists
+    const user = await db.prepare('SELECT user_id, devices FROM users WHERE username = ?')
+      .bind(username)
+      .first();
+      
+    if (!user) {
+      return json({ success: false, message: 'User not found' }, 404);
+    }
+    
+    // Parse existing devices
+    let devices = [];
+    try {
+      devices = JSON.parse(user.devices as string || '[]');
+      if (!Array.isArray(devices)) {
+        devices = [];
+      }
+    } catch (e) {
+      console.error('Failed to parse devices:', e);
+      devices = [];
+    }
+    
+    // Convert to string for consistent comparison
+    const deviceStr = device_id.toString();
+    
+    // Check if device is in the list
+    const index = devices.indexOf(deviceStr);
+    if (index === -1) {
+      return json({ 
+        success: true, 
+        message: 'Device ID was not assigned to this user', 
+        devices: devices 
+      });
+    }
+    
+    // Remove device from the list
+    devices.splice(index, 1);
+    
+    // Update user's devices
+    const result = await db.prepare('UPDATE users SET devices = ? WHERE username = ?')
+      .bind(JSON.stringify(devices), username)
+      .run();
+      
+    if (result.success) {
+      return json({ 
+        success: true, 
+        message: 'Device removed successfully', 
+        devices: devices 
+      });
+    } else {
+      return json({ success: false, message: 'Failed to update user devices' }, 500);
+    }
+  } catch (error) {
+    console.error('Error in handleRemoveDeviceFromUser:', error);
+    return json({ success: false, message: 'An error occurred' }, 500);
+  }
+}
+
 async function handleRegister(request: Request, db: D1Database) {
   if (request.method !== 'POST') {
     return text('Method Not Allowed', 405);
   }
 
   try {
+    // @ts-ignore
     const { username, password } = await request.json();
 
     if (!username || !password) {
@@ -89,6 +237,7 @@ async function handleRegister(request: Request, db: D1Database) {
     return json({ success: false, message: 'An internal error occurred during registration.' }, 500);
   }
 }
+// @ts-ignore
 __name(handleRegister, "handleRegister");
 
 async function handleLogin(request: Request, db: D1Database) {
@@ -97,6 +246,7 @@ async function handleLogin(request: Request, db: D1Database) {
   }
 
   try {
+    // @ts-ignore
     const { username, password } = await request.json();
 
     if (!username || !password) {
@@ -139,6 +289,7 @@ async function handleLogin(request: Request, db: D1Database) {
     return json({ success: false, message: 'An internal error occurred.' }, 500);
   }
 }
+// @ts-ignore
 __name(handleLogin, "handleLogin");
 
 // @ts-ignore
@@ -156,8 +307,8 @@ async function handleDevice(request, db, searchParams) {
 
     if (device_ids_plural) {
         const ids = device_ids_plural.split(',')
-            .map(id => id.trim())
-            .filter(id => id !== '');
+            .map((id: string) => id.trim())
+            .filter((id: string) => id !== '');
         if (ids.length > 0) {
             query += ` AND device_id IN (${ids.map(() => '?').join(',')})`;
             params.push(...ids);
@@ -449,10 +600,12 @@ async function handleMessages(request, db, searchParams) {
 function json(obj: any, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
 }
+// @ts-ignore
 __name(json, "json");
 
 // @ts-ignore
 function text(msg: string, status = 200) {
   return new Response(msg, { status, headers: { 'Content-Type': 'text/plain' } });
 }
+// @ts-ignore
 __name(text, "text");

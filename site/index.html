@@ -306,10 +306,54 @@
                 <button id="btnTestDelete">Test Delete</button>
                 <span id="lastDeviceInfo" style="margin-left:10px;color:#0e838f;font-weight:bold;"></span>
             </div>
+            
+            <!-- New section for device ID management -->
+            <div style="margin-top:20px; border-top:1px solid #ddd; padding-top:15px;">
+                <h3>Manage Your Device IDs</h3>
+                <div style="margin-bottom:10px;">
+                    <input type="text" id="deviceIdInput" placeholder="Device ID (3-20 digits)" 
+                           style="padding:8px; border-radius:4px; width:200px; margin-right:10px;"
+                           pattern="[0-9]{3,20}" title="Enter 3-20 digits only">
+                    <br/>
+                    <br/>
+                    <button id="btnAddDeviceToUser" style="background-color:#28a745; color:white; padding:8px 15px; border:none; border-radius:4px; cursor:pointer; margin-right:10px;">Add to My Account</button>
+                    <button id="btnRemoveDeviceFromUser" style="background-color:#dc3545; color:white; padding:8px 15px; border:none; border-radius:4px; cursor:pointer;">Remove from My Account</button>
+                </div>
+                <div id="deviceManagementResult" style="margin-top:10px; font-weight:bold;"></div>
+                <div style="margin-top:10px;">
+                    <p>Your current device IDs: <span id="userDevicesList">Loading...</span></p>
+                </div>
+            </div>
         </section>
     </main>
 </div>
 <script>
+
+    // --- variables ---
+    const deviceSelect = document.getElementById('deviceSelect');
+    const sensorSelect = document.getElementById('sensorSelect');
+    const chartCtx = document.getElementById('sensorDataChart');
+    const timeRangeButtons = document.getElementById('timeRangeButtons');
+    const chartTypeSelect = document.getElementById('chartTypeSelect');
+    const defaultTimeRangeSelect = document.getElementById('defaultTimeRangeSelect');
+    const defaultChartTypeSelect = document.getElementById('defaultChartTypeSelect');
+    const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+    const autoRefreshCheckbox = document.getElementById('autoRefreshCheckbox');
+    const autoRefreshIntervalInput = document.getElementById('autoRefreshInterval');
+    const addWidgetBtn = document.getElementById('addWidgetBtn');
+    const widgetContainer = document.getElementById('widgetContainer');
+    const tabs = document.querySelectorAll('.tabBtn');
+    const contents = document.querySelectorAll('.tab-content');
+    let currentChart = null;
+    let updating = false;
+    // remember each line's color
+    let lineColors = {};
+
+    let selectedDeviceId = localStorage.getItem('iot-dashboard-deviceId') || null;
+    let selectedSensorIds = localStorage.getItem('iot-dashboard-sensorId')?.split(',') || [];
+    let selectedTimeRange = localStorage.getItem('iot-dashboard-timeRange') || 'hour';
+    let selectedChartType = localStorage.getItem('iot-dashboard-chartType') || 'line';
+    let lastMessageTimestamp = Math.floor(Date.now() / 1000);
 
     // chart
     let autoRefreshTimer = null;
@@ -322,52 +366,9 @@
     let lastSensorId = localStorage.getItem('lastSensorId') || null;
     let lastSensorDataId = localStorage.getItem('lastSensorDataId') || null;
 
-    // --- TAB ---
-    const tabs = document.querySelectorAll('.tabBtn');
-    const contents = document.querySelectorAll('.tab-content');
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            tabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            contents.forEach(c => c.classList.remove('active'));
-            document.getElementById(tab.dataset.tab).classList.add('active');
-
-            // Show lastDeviceId beside testDelete button when Test tab is active
-            if (tab.dataset.tab === 'test') {
-                loadTestDeviceList();
-            }
-        });
-    });
-
-    // --- variables ---
-    const deviceSelect = document.getElementById('deviceSelect');
-    const sensorSelect = document.getElementById('sensorSelect');
-    const timeRangeButtons = document.getElementById('timeRangeButtons');
-    const chartTypeSelect = document.getElementById('chartTypeSelect');
-    const chartCtx = document.getElementById('sensorDataChart').getContext('2d');
-    const widgetContainer = document.getElementById('widgetContainer');
-    const addWidgetBtn = document.getElementById('addWidgetBtn');
-    const defaultTimeRangeSelect = document.getElementById('defaultTimeRangeSelect');
-    const defaultChartTypeSelect = document.getElementById('defaultChartTypeSelect');
-    const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-    const autoRefreshCheckbox = document.getElementById('autoRefreshCheckbox');
-    const autoRefreshIntervalInput = document.getElementById('autoRefreshInterval');
-
-    let currentChart = null;
-    let renderPending = false;
-    let lastDatasets = null;
-    let updating = false;
-    // remember each line's color
-    let lineColors = {};
-
-    let selectedDeviceId = null;
-    let selectedSensorIds = [];
-    let selectedTimeRange = 'hour';
-    let selectedChartType = 'line';
-    let widgets = [];
-
     // User session data
     let currentUser = null;
+    let messageCheckInterval = null; // Track message check interval
 
     function getLineColor(label, idx) {
         if (!lineColors[label]) {
@@ -398,6 +399,22 @@
         }, Number(autoRefreshIntervalInput.value) * 1000);
     }
 
+    // Function to start message checking interval
+    function startMessageChecker() {
+        if (messageCheckInterval) clearInterval(messageCheckInterval); // Prevent duplicate intervals
+        messageCheckInterval = setInterval(checkNewMessages, 3000);
+        console.log('Message checker started');
+    }
+
+    // Function to stop message checking interval
+    function stopMessageChecker() {
+        if (messageCheckInterval) {
+            clearInterval(messageCheckInterval);
+            messageCheckInterval = null;
+            console.log('Message checker stopped');
+        }
+    }
+
     // --- init ---
     async function initDashboard() {
         loadSettings();
@@ -405,7 +422,7 @@
         await loadAndRenderSensorData();
         setupEventListeners(); // Original event listeners
         startAutoRefresh();
-        setInterval(checkNewMessages, 3000);
+        startMessageChecker(); // Start message checker after login
     }
 
     // --- Login and Session Management ---
@@ -557,6 +574,7 @@
             logoutButton.addEventListener('click', () => {
                 localStorage.removeItem('sessionToken');
                 localStorage.removeItem('userData');
+                stopMessageChecker(); // Stop message checker on logout
                 // Clear sensitive cached data if any
                 chartDataCache = [];
                 chartLastTimestamp = 0;
@@ -1219,6 +1237,146 @@
             }
         });
 
+        // Add event listeners for device ID management
+        const deviceIdInput = document.getElementById('deviceIdInput');
+        const btnAddDeviceToUser = document.getElementById('btnAddDeviceToUser');
+        const btnRemoveDeviceFromUser = document.getElementById('btnRemoveDeviceFromUser');
+        const deviceManagementResult = document.getElementById('deviceManagementResult');
+
+        // Input validation for device ID (numbers only, 3-20 digits)
+        deviceIdInput.addEventListener('input', function() {
+            this.value = this.value.replace(/[^0-9]/g, '');
+            if (this.value.length > 20) {
+                this.value = this.value.slice(0, 20);
+            }
+        });
+        
+        // Add device ID to user
+        btnAddDeviceToUser.addEventListener('click', async () => {
+            const deviceId = deviceIdInput.value.trim();
+            
+            // Input validation
+            if (!deviceId || deviceId.length < 3 || deviceId.length > 20 || !/^\d+$/.test(deviceId)) {
+                deviceManagementResult.textContent = 'Please enter a valid device ID (3-20 digits)';
+                deviceManagementResult.style.color = '#dc3545';
+                return;
+            }
+            
+            // Check if user is logged in
+            if (!currentUser || !currentUser.username) {
+                deviceManagementResult.textContent = 'Please login first';
+                deviceManagementResult.style.color = '#dc3545';
+                return;
+            }
+            
+            deviceManagementResult.textContent = 'Processing...';
+            deviceManagementResult.style.color = '#0e838f';
+            
+            try {
+                const response = await fetch('/api/user/devices/add', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        username: currentUser.username,
+                        device_id: deviceId
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    // Update current user data with the new devices list
+                    currentUser.devices = result.devices;
+                    localStorage.setItem('userData', JSON.stringify(currentUser));
+                    
+                    deviceManagementResult.textContent = result.message || 'Device added successfully';
+                    deviceManagementResult.style.color = '#28a745';
+                    
+                    // Clear input field
+                    deviceIdInput.value = '';
+                    
+                    // Refresh device lists
+                    updateUserDevicesList();
+                    await loadDevices(); // Reload main device dropdown
+                } else {
+                    deviceManagementResult.textContent = result.message || 'Failed to add device';
+                    deviceManagementResult.style.color = '#dc3545';
+                }
+            } catch (error) {
+                console.error('Error adding device:', error);
+                deviceManagementResult.textContent = 'An error occurred. Check console for details.';
+                deviceManagementResult.style.color = '#dc3545';
+            }
+        });
+        
+        // Remove device ID from user
+        btnRemoveDeviceFromUser.addEventListener('click', async () => {
+            const deviceId = deviceIdInput.value.trim();
+            
+            // Input validation
+            if (!deviceId || !/^\d+$/.test(deviceId)) {
+                deviceManagementResult.textContent = 'Please enter a valid device ID';
+                deviceManagementResult.style.color = '#dc3545';
+                return;
+            }
+            
+            // Check if user is logged in
+            if (!currentUser || !currentUser.username) {
+                deviceManagementResult.textContent = 'Please login first';
+                deviceManagementResult.style.color = '#dc3545';
+                return;
+            }
+            
+            deviceManagementResult.textContent = 'Processing...';
+            deviceManagementResult.style.color = '#0e838f';
+            
+            try {
+                const response = await fetch('/api/user/devices/remove', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        username: currentUser.username,
+                        device_id: deviceId
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    // Update current user data with the new devices list
+                    currentUser.devices = result.devices;
+                    localStorage.setItem('userData', JSON.stringify(currentUser));
+                    
+                    deviceManagementResult.textContent = result.message || 'Device removed successfully';
+                    deviceManagementResult.style.color = '#28a745';
+                    
+                    // Clear input field
+                    deviceIdInput.value = '';
+                    
+                    // Refresh device lists
+                    updateUserDevicesList();
+                    await loadDevices(); // Reload main device dropdown
+                } else {
+                    deviceManagementResult.textContent = result.message || 'Failed to remove device';
+                    deviceManagementResult.style.color = '#dc3545';
+                }
+            } catch (error) {
+                console.error('Error removing device:', error);
+                deviceManagementResult.textContent = 'An error occurred. Check console for details.';
+                deviceManagementResult.style.color = '#dc3545';
+            }
+        });
+    }
+
+    // Function to update user devices list display
+    function updateUserDevicesList() {
+        const userDevicesList = document.getElementById('userDevicesList');
+        
+        if (currentUser && currentUser.devices && currentUser.devices.length > 0) {
+            userDevicesList.textContent = currentUser.devices.join(', ');
+        } else {
+            userDevicesList.textContent = 'No devices assigned';
+        }
     }
 
     async function addTestDevice() {
@@ -1239,6 +1397,33 @@
         localStorage.setItem('lastDeviceId', data.insertedId);
         lastDeviceId = data.insertedId;
         alert('Added device ID: '+data.insertedId);
+        
+        // Add the new device to current user's device list if logged in
+        if (currentUser && currentUser.username) {
+            try {
+                const response = await fetch('/api/user/devices/add', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        username: currentUser.username,
+                        device_id: data.insertedId.toString()
+                    })
+                });
+                
+                const result = await response.json();
+                if (response.ok && result.success) {
+                    // Update current user data
+                    currentUser.devices = result.devices;
+                    localStorage.setItem('userData', JSON.stringify(currentUser));
+                    console.log('Device added to user account:', data.insertedId);
+                    updateUserDevicesList();
+                    await loadDevices(); // Reload main device dropdown
+                }
+            } catch (error) {
+                console.error('Error adding device to user:', error);
+            }
+        }
+        
         await loadTestDeviceList();
         return data.insertedId;
     }
@@ -1347,7 +1532,6 @@
 
     }
 
-    let lastMessageTimestamp = Math.floor(Date.now() / 1000);
 
 
 
@@ -1444,6 +1628,31 @@
         localStorage.setItem('lastSensorId', sensors[0].sensor_id);
     }
 
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            contents.forEach(c => c.classList.remove('active'));
+            document.getElementById(tab.dataset.tab).classList.add('active');
+
+            // Show lastDeviceId beside testDelete button when Test tab is active
+            if (tab.dataset.tab === 'test') {
+                loadTestDeviceList();
+                updateUserDevicesList(); // Update user devices list when switching to Test tab
+            }
+        });
+    });
+
+
+
+    // Generate colors for pie/doughnut charts
+    function pieColors(count) {
+        const baseColors = [
+            '#0e838f', '#8a2be2', '#ff7f50', '#ffdc34', '#0ecb81', '#c74e4e', '#bc7af9',
+            '#f08a5d', '#f9ed69', '#3ec1d3', '#ffb6b9', '#283c63'
+        ];
+        return Array(count).fill(0).map((_, i) => baseColors[i % baseColors.length]);
+    }
 </script>
 </body>
 </html>
