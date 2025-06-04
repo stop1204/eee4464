@@ -4,3 +4,7 @@
 # run wrangler dev server
 run:
 	npx wrangler dev --remote
+
+# watching log
+watch:
+	npx wrangler tail

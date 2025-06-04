@@ -33,6 +33,23 @@ var index_default = {
     if (pathname.startsWith('/api/controls')) return handleControls(request, db, searchParams);
     if (pathname.startsWith('/api/messages')) return handleMessages(request, db, searchParams);
 
+    if (pathname.startsWith('/ws')) {
+      if (request.headers.get('Upgrade') !== 'websocket') {
+        return new Response('Expected websocket', { status: 400 });
+      }
+
+      const webSocketPair = new WebSocketPair();
+      const clientWebSocket = webSocketPair[1];
+      const serverWebSocket = webSocketPair[0];
+
+      handleWebSocket(serverWebSocket, db);
+
+      return new Response(null, {
+        status: 101,
+        webSocket: clientWebSocket,
+      });
+    }
+
     return new Response(renderHtml(), {
       headers: {
         "content-type": "text/html"
@@ -665,6 +682,80 @@ async function handleMessages(request, db, searchParams) {
   }
 
   return text('Method Not Allowed', 405);
+}
+
+// @ts-ignore
+/* test WebSocket client code in browser console:
+  * const ws = new WebSocket('ws://127.0.0.1:8787/ws');
+    ws.onopen = () => {
+      console.log('WebSocket connected');
+      // test subscribe action
+      ws.send(JSON.stringify({ action: "subscribe", topic: "test/topic" }));
+    };
+
+    ws.onmessage = (event) => {
+      console.log('Message from server:', event.data);
+    };
+
+    ws.onerror = (err) => {
+      console.error('WebSocket error:', err);
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket closed');
+    };
+
+    *
+    * // results: Message from server: {"status":"subscribed","topic":"test/topic"}
+  *
+  *
+  * */
+async function handleWebSocket(webSocket: WebSocket, db: D1Database) {
+  webSocket.accept();
+
+  // save subscribed topics in a Set
+  let subscribedTopics = new Set<string>();
+
+  webSocket.addEventListener('message',  (event) => {
+    (async () => {
+
+      try {
+        const msg = JSON.parse(event.data);
+        // simple protocol example:
+        // { action: "subscribe", topic: "sensor/123" }
+        // { action: "publish", topic: "sensor/123", payload: "..." }
+
+        if (msg.action === 'subscribe' && typeof msg.topic === 'string') {
+          subscribedTopics.add(msg.topic);
+          webSocket.send(JSON.stringify({status: 'subscribed', topic: msg.topic}));
+        } else if (msg.action === 'unsubscribe' && typeof msg.topic === 'string') {
+          subscribedTopics.delete(msg.topic);
+          webSocket.send(JSON.stringify({status: 'unsubscribed', topic: msg.topic}));
+        } else if (msg.action === 'publish' && typeof msg.topic === 'string') {
+          // simple publish action
+          // broadcast to all subscribed clients
+
+          webSocket.send(JSON.stringify({status: 'published', topic: msg.topic, payload: msg.payload}));
+          // TODO:  publish to subscribed clients
+          //
+        } else {
+          webSocket.send(JSON.stringify({error: 'Invalid action or message format'}));
+        }
+      } catch (err) {
+        webSocket.send(JSON.stringify({error: 'Invalid JSON format'}));
+      }
+    })();
+  });
+
+  webSocket.addEventListener('close', () => {
+    // clean connections
+    subscribedTopics.clear();
+  });
+
+  webSocket.addEventListener('error', (e) => {
+    console.error('WebSocket error:', e);
+    webSocket.close();
+  });
 }
 
 // @ts-ignore
