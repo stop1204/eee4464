@@ -175,7 +175,7 @@ async function handleRemoveDeviceFromUser(request: Request, db: D1Database) {
       
     if (result.success) {
       return json({ 
-        success: true, f
+        success: true,
         message: 'Device removed successfully', 
         devices: devices 
       });
@@ -680,3 +680,4 @@ function text(msg: string, status = 200) {
 }
 // @ts-ignore
 __name(text, "text");
+
