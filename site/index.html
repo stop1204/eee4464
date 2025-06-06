@@ -259,7 +259,7 @@
          <div id="mqttWidgetModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.3); align-items:center; justify-content:center; z-index:1000;">
                         <div style="background:white; padding:20px; border-radius:10px; min-width:300px;">
                             <h3>Add MQTT Widget</h3>
-                            <input id="mqttBrokerUrl" placeholder="Broker URL" style="width:100%; margin-bottom:8px;" />
+                            <input id="mqttBrokerUrl" placeholder="Broker URL(wss://url:port)" style="width:100%; margin-bottom:8px;" />
                             <input id="mqttTopic" placeholder="Topic" style="width:100%; margin-bottom:8px;" />
                             <input id="mqttAccount" placeholder="Account" style="width:100%; margin-bottom:8px;" />
                             <input id="mqttPassword" placeholder="Password" type="password" style="width:100%; margin-bottom:8px;" />
@@ -1241,18 +1241,96 @@
 
     async function loadWidgets() {
         if (!selectedDeviceId) {
-            widgetContainer.innerHTML = '请先选择设备';
+            widgetContainer.innerHTML = 'Please select a device first';
             return;
         }
         const res = await fetch(`/api/controls?device_id=${selectedDeviceId}`);
         const controls = await res.json();
-        widgets = controls;
+        widgets = controls.map(ctrl => {
+            if (ctrl.control_type === 'MQTT') {
+                try {
+                    const mqttData = JSON.parse(ctrl.state);
+                    return { ...ctrl, ...mqttData, isMqtt: true };
+                } catch {
+                    return { ...ctrl, isMqtt: true, error: 'Invalid MQTT JSON' };
+                }
+            }
+            return ctrl;
+        });
         renderWidgets();
     }
 
     function renderWidgets() {
         widgetContainer.innerHTML = '';
         widgets.forEach(w => {
+            // if control type is 'MQTT' skip this one
+            if(w.control_type === 'MQTT'){
+                // TODO: render MQTT widget
+                // load the data from control.state JSON data
+                // fill this data in 'mqttWidgetModal' and then trigger save action
+                const mqttData = JSON.parse(w.state || '{}');
+
+                const brokerUrl = document.getElementById('mqttBrokerUrl').value.trim();
+                const topic = document.getElementById('mqttTopic').value.trim();
+                const account = document.getElementById('mqttAccount').value.trim();
+                const password = document.getElementById('mqttPassword').value.trim();
+                brokerUrl.value = mqttData.brokerUrl || brokerUrl;
+                topic.value = mqttData.topic || topic;
+                account.value = mqttData.account || account;
+                password.value = mqttData.password || password;
+                console.log(brokerUrl);
+                const mqttWidgetModal = document.getElementById('mqttWidgetModal');
+                if (!brokerUrl || !topic || !account || !password) {
+                    alert('Broker URL, Topic, Account, and Password are required');
+                    return;
+                }
+                const widgetInfo = { brokerUrl, topic, account, password };
+                // Create MQTT client
+                const client = mqtt.connect(brokerUrl, {
+                    username: account,
+                    password: password
+                });
+                const widget = { brokerUrl, topic, account, password, statusJson: JSON.stringify({ connected: false }) };
+                mqttWidgets.push(widget);
+                mqttClients.push(client);
+                localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+                renderMqttWidgets();
+                client.on('connect', () => {
+                    widget.statusJson = JSON.stringify({ connected: true, lastMessage: '' });
+                    localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+                    renderMqttWidgets();
+                    client.subscribe(topic, (err) => {
+                        if (err) {
+                            widget.statusJson = JSON.stringify({ connected: false, error: 'Subscribe failed' });
+                            localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+                            renderMqttWidgets();
+                        }
+                    });
+                });
+
+                client.on('message', (t, message) => {
+                    if (t === topic) {
+                        widget.statusJson = JSON.stringify({ connected: true, lastMessage: message.toString() });
+                        localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+                        renderMqttWidgets();
+                    }
+                });
+
+                client.on('error', (err) => {
+                    widget.statusJson = JSON.stringify({ connected: false, error: err.message });
+                    localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+                    renderMqttWidgets();
+                });
+
+                document.getElementById('mqttWidgetModal').style.display = 'none';
+                document.getElementById('mqttBrokerUrl').value = '';
+                document.getElementById('mqttTopic').value = '';
+                document.getElementById('mqttAccount').value = '';
+                document.getElementById('mqttPassword').value = '';
+
+
+            }
+
             const div = document.createElement('div');
             div.className = 'widget';
             div.innerHTML = `
@@ -1627,7 +1705,22 @@
                 alert('Broker URL, Topic, Account, and Password are required');
                 return;
             }
+            const widgetInfo = { brokerUrl, topic, account, password };
 
+
+            // You may want to generate a unique control_id or let the backend do it
+            fetch('/api/controls', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    device_id: selectedDeviceId, // or null if not linked to a device
+                    control_type: 'MQTT',
+                    control_name: `MQTT: ${topic}`,
+                    state: JSON.stringify(widgetInfo),
+                    // control_id: `mqtt_${Date.now()}_${Math.random().toString(36).slice(2,8)}`
+                    control_id: sensorSelect.value
+                })
+            });
             // Create MQTT client
             const client = mqtt.connect(brokerUrl, {
                 username: account,
