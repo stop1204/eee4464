@@ -33,6 +33,10 @@ Outside of this repo, you can start a new project with this template using [C3](
 ```
 npm create cloudflare@latest -- --template=YOUR_TEMPLATE_PATH_HERE # TODO: Update this if it becomes a C3 template
 ```
+GNUWin32 (Makefile tools)
+``` 
+https://sourceforge.net/projects/gnuwin32/files/latest/download
+```
 
 <!-- A live public deployment of this template is available at [https://d1-template.templates.workers.dev](https://d1-template.templates.workers.dev) -->
 <!-- TODO: Update with the new deployment URL once available -->
