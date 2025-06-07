@@ -402,7 +402,7 @@
     let currentUser = null;
     let messageCheckInterval = null; // Track message check interval
 
-    let mqttWidgets = JSON.parse(localStorage.getItem('mqttWidgets') || '[]');
+    let mqttWidgets = JSON.parse('[]');
     let mqttClients = [];
 
     function renderMqttWidgets() {
@@ -432,7 +432,6 @@
                 mqttClients[idx] = null;
             }
             mqttWidgets.splice(idx, 1);
-            localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
             renderMqttWidgets();
         };
         container.appendChild(div);
@@ -474,7 +473,6 @@
                     lastMessage: 'Random: ' + Math.random().toString(36).substring(2, 8)
                 });
             });
-            localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
             renderMqttWidgets();
         }, Number(autoRefreshIntervalInput.value) * 1000);
 
@@ -742,7 +740,7 @@
 
 
 
-        mqttWidgets.forEach((w, idx) => {
+        /* mqttWidgets.forEach((w, idx) => {
 
             const client = mqtts.connect(w.brokerUrl, {
                 username: w.account,
@@ -751,12 +749,10 @@
             mqttClients[idx] = client;
             client.on('connect', () => {
                 w.statusJson = JSON.stringify({ connected: true, lastMessage: '' });
-                localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
                 renderMqttWidgets();
                 client.subscribe(w.topic, (err) => {
                     if (err) {
                         w.statusJson = JSON.stringify({ connected: false, error: 'Subscribe failed' });
-                        localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
                         renderMqttWidgets();
                     }
                 });
@@ -764,17 +760,15 @@
             client.on('message', (t, message) => {
                 if (t === w.topic) {
                     w.statusJson = JSON.stringify({ connected: true, lastMessage: message.toString() });
-                    localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
                     renderMqttWidgets();
                 }
             });
             client.on('error', (err) => {
                 w.statusJson = JSON.stringify({ connected: false, error: err.message });
-                localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
                 renderMqttWidgets();
             });
         });
-        renderMqttWidgets();
+        renderMqttWidgets();  */
     });
 
     // --- load devices ---
@@ -1263,21 +1257,23 @@
     function renderWidgets() {
         widgetContainer.innerHTML = '';
         widgets.forEach(w => {
+            console.log('Rendering widget:', w.control_type);
             // if control type is 'MQTT' skip this one
             if(w.control_type === 'MQTT'){
+
                 // TODO: render MQTT widget
                 // load the data from control.state JSON data
                 // fill this data in 'mqttWidgetModal' and then trigger save action
                 const mqttData = JSON.parse(w.state || '{}');
 
-                const brokerUrl = document.getElementById('mqttBrokerUrl').value.trim();
-                const topic = document.getElementById('mqttTopic').value.trim();
-                const account = document.getElementById('mqttAccount').value.trim();
-                const password = document.getElementById('mqttPassword').value.trim();
-                brokerUrl.value = mqttData.brokerUrl || brokerUrl;
-                topic.value = mqttData.topic || topic;
-                account.value = mqttData.account || account;
-                password.value = mqttData.password || password;
+                let brokerUrl = document.getElementById('mqttBrokerUrl').value.trim();
+                let topic = document.getElementById('mqttTopic').value.trim();
+                let account = document.getElementById('mqttAccount').value.trim();
+                let password = document.getElementById('mqttPassword').value.trim();
+                brokerUrl = mqttData.brokerUrl || brokerUrl;
+                topic = mqttData.topic || topic;
+                account = mqttData.account || account;
+                password = mqttData.password || password;
                 console.log(brokerUrl);
                 const mqttWidgetModal = document.getElementById('mqttWidgetModal');
                 if (!brokerUrl || !topic || !account || !password) {
@@ -1293,16 +1289,13 @@
                 const widget = { brokerUrl, topic, account, password, statusJson: JSON.stringify({ connected: false }) };
                 mqttWidgets.push(widget);
                 mqttClients.push(client);
-                localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
                 renderMqttWidgets();
                 client.on('connect', () => {
                     widget.statusJson = JSON.stringify({ connected: true, lastMessage: '' });
-                    localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
                     renderMqttWidgets();
                     client.subscribe(topic, (err) => {
                         if (err) {
                             widget.statusJson = JSON.stringify({ connected: false, error: 'Subscribe failed' });
-                            localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
                             renderMqttWidgets();
                         }
                     });
@@ -1311,14 +1304,12 @@
                 client.on('message', (t, message) => {
                     if (t === topic) {
                         widget.statusJson = JSON.stringify({ connected: true, lastMessage: message.toString() });
-                        localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
                         renderMqttWidgets();
                     }
                 });
 
                 client.on('error', (err) => {
                     widget.statusJson = JSON.stringify({ connected: false, error: err.message });
-                    localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
                     renderMqttWidgets();
                 });
 
@@ -1327,8 +1318,7 @@
                 document.getElementById('mqttTopic').value = '';
                 document.getElementById('mqttAccount').value = '';
                 document.getElementById('mqttPassword').value = '';
-
-
+                return;
             }
 
             const div = document.createElement('div');
@@ -1730,17 +1720,14 @@
             const widget = { brokerUrl, topic, account, password, statusJson: JSON.stringify({ connected: false }) };
             mqttWidgets.push(widget);
             mqttClients.push(client);
-            localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
             renderMqttWidgets();
 
             client.on('connect', () => {
                 widget.statusJson = JSON.stringify({ connected: true, lastMessage: '' });
-                localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
                 renderMqttWidgets();
                 client.subscribe(topic, (err) => {
                     if (err) {
                         widget.statusJson = JSON.stringify({ connected: false, error: 'Subscribe failed' });
-                        localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
                         renderMqttWidgets();
                     }
                 });
@@ -1749,14 +1736,12 @@
             client.on('message', (t, message) => {
                 if (t === topic) {
                     widget.statusJson = JSON.stringify({ connected: true, lastMessage: message.toString() });
-                    localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
                     renderMqttWidgets();
                 }
             });
 
             client.on('error', (err) => {
                 widget.statusJson = JSON.stringify({ connected: false, error: err.message });
-                localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
                 renderMqttWidgets();
             });
 
