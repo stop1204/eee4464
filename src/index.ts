@@ -602,8 +602,11 @@ async function handleControls(request, db, searchParams) {
   }
 
   if (request.method === 'POST') {
-    const { device_id, control_id, control_type, control_name, state } = await request.json();
+    let { device_id, control_id, control_type, control_name, state } = await request.json();
     if (!device_id || !control_id || !control_type) return text('Missing device_id or control_type', 400);
+
+    // Convert control_id to number if possible
+    if (/^\d+$/.test(control_id)) control_id = Number(control_id);
 
     const insert = await db.prepare(`
       INSERT INTO controls (device_id, control_type, control_name, state, updated_at, control_id)

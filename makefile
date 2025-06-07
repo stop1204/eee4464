@@ -8,3 +8,7 @@ run:
 # watching log
 watch:
 	npx wrangler tail
+
+init:
+	npx wrangler init --site
+	wrangler login

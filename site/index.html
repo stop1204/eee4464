@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="https://static.integrations.cloudflare.com/styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background: #f5f7fa; display: flex; flex-direction: column; min-height: 100vh; }
         header { padding: 10px 20px; background: #0e838f; color: white; display: flex; justify-content: space-between; align-items: center; }
@@ -255,11 +256,26 @@
             </div>
             <canvas id="sensorDataChart" width="800" height="400" style="max-width: 800px; height: 400px;"></canvas>
         </section>
-
+         <div id="mqttWidgetModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.3); align-items:center; justify-content:center; z-index:1000;">
+                        <div style="background:white; padding:20px; border-radius:10px; min-width:300px;">
+                            <h3>Add MQTT Widget</h3>
+                            <input id="mqttBrokerUrl" placeholder="Broker URL(wss://url:port)" style="width:100%; margin-bottom:8px;" />
+                            <input id="mqttTopic" placeholder="Topic" style="width:100%; margin-bottom:8px;" />
+                            <input id="mqttAccount" placeholder="Account" style="width:100%; margin-bottom:8px;" />
+                            <input id="mqttPassword" placeholder="Password" type="password" style="width:100%; margin-bottom:8px;" />
+                            <button id="saveMqttWidgetBtn">Connect & Save</button>
+                            <button id="cancelMqttWidgetBtn" style="margin-left:10px;">Cancel</button>
+                        </div>
+                    </div>
         <!-- Widgets Tab -->
         <section id="widgets" class="tab-content">
+
             <button id="addWidgetBtn">Add Status Widget</button>
+            <button id="addMqttWidgetBtn" style="margin-bottom:10px;">Add MQTT Widget</button>
+
+            <div id="mqttWidgetsContainer"></div>
             <div id="widgetContainer"></div>
+
         </section>
 
         <!-- Settings Tab -->
@@ -386,6 +402,43 @@
     let currentUser = null;
     let messageCheckInterval = null; // Track message check interval
 
+    let mqttWidgets = JSON.parse(localStorage.getItem('mqttWidgets') || '[]');
+    let mqttClients = [];
+
+    function renderMqttWidgets() {
+    const container = document.getElementById('mqttWidgetsContainer');
+    container.innerHTML = '';
+    mqttWidgets.forEach((w, idx) => {
+        let status;
+        try {
+            status = JSON.parse(w.statusJson);
+        } catch {
+            status = { error: 'Invalid JSON' };
+        }
+        const div = document.createElement('div');
+        div.className = 'widget';
+        div.innerHTML = `
+            <button class="closeBtn" title="Remove">&times;</button>
+            <h4>MQTT Widget</h4>
+<!--            <div>Broker: ${w.brokerUrl}</div>-->
+            <div>Topic: ${w.topic}</div>
+            <div>Status: ${status.connected ? 'Connected' : 'Disconnected'}</div>
+            <div>Last Message: ${status.lastMessage || status.error || ''}</div>
+        `;
+        div.querySelector('.closeBtn').onclick = () => {
+            // Disconnect client if exists
+            if (mqttClients[idx]) {
+                mqttClients[idx].end(true);
+                mqttClients[idx] = null;
+            }
+            mqttWidgets.splice(idx, 1);
+            localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+            renderMqttWidgets();
+        };
+        container.appendChild(div);
+    });
+}
+
     function getLineColor(label, idx) {
         if (!lineColors[label]) {
             const baseColors = [
@@ -412,7 +465,20 @@
         if (!autoRefreshCheckbox.checked) return;
         autoRefreshTimer = setInterval(() => {
             fetchNewSensorData();
+
+
+            mqttWidgets.forEach(w => {
+                // Simulate a new message
+                w.statusJson = JSON.stringify({
+                    connected: true,
+                    lastMessage: 'Random: ' + Math.random().toString(36).substring(2, 8)
+                });
+            });
+            localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+            renderMqttWidgets();
         }, Number(autoRefreshIntervalInput.value) * 1000);
+
+
     }
 
     // Function to start message checking interval
@@ -437,7 +503,9 @@
         loadSettings();
         setupEventListeners(); // Original event listeners  this should be called after login and brefore loading devices
         await loadDevices(); // This will now use user-specific devices
+        renderMqttWidgets();
         startMessageChecker(); // Start message checker after login
+
     }
 
     // --- Login and Session Management ---
@@ -671,6 +739,42 @@
                 }
             });
         }
+
+
+
+        mqttWidgets.forEach((w, idx) => {
+
+            const client = mqtts.connect(w.brokerUrl, {
+                username: w.account,
+                password: w.password
+            });
+            mqttClients[idx] = client;
+            client.on('connect', () => {
+                w.statusJson = JSON.stringify({ connected: true, lastMessage: '' });
+                localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+                renderMqttWidgets();
+                client.subscribe(w.topic, (err) => {
+                    if (err) {
+                        w.statusJson = JSON.stringify({ connected: false, error: 'Subscribe failed' });
+                        localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+                        renderMqttWidgets();
+                    }
+                });
+            });
+            client.on('message', (t, message) => {
+                if (t === w.topic) {
+                    w.statusJson = JSON.stringify({ connected: true, lastMessage: message.toString() });
+                    localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+                    renderMqttWidgets();
+                }
+            });
+            client.on('error', (err) => {
+                w.statusJson = JSON.stringify({ connected: false, error: err.message });
+                localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+                renderMqttWidgets();
+            });
+        });
+        renderMqttWidgets();
     });
 
     // --- load devices ---
@@ -1137,18 +1241,96 @@
 
     async function loadWidgets() {
         if (!selectedDeviceId) {
-            widgetContainer.innerHTML = '请先选择设备';
+            widgetContainer.innerHTML = 'Please select a device first';
             return;
         }
         const res = await fetch(`/api/controls?device_id=${selectedDeviceId}`);
         const controls = await res.json();
-        widgets = controls;
+        widgets = controls.map(ctrl => {
+            if (ctrl.control_type === 'MQTT') {
+                try {
+                    const mqttData = JSON.parse(ctrl.state);
+                    return { ...ctrl, ...mqttData, isMqtt: true };
+                } catch {
+                    return { ...ctrl, isMqtt: true, error: 'Invalid MQTT JSON' };
+                }
+            }
+            return ctrl;
+        });
         renderWidgets();
     }
 
     function renderWidgets() {
         widgetContainer.innerHTML = '';
         widgets.forEach(w => {
+            // if control type is 'MQTT' skip this one
+            if(w.control_type === 'MQTT'){
+                // TODO: render MQTT widget
+                // load the data from control.state JSON data
+                // fill this data in 'mqttWidgetModal' and then trigger save action
+                const mqttData = JSON.parse(w.state || '{}');
+
+                const brokerUrl = document.getElementById('mqttBrokerUrl').value.trim();
+                const topic = document.getElementById('mqttTopic').value.trim();
+                const account = document.getElementById('mqttAccount').value.trim();
+                const password = document.getElementById('mqttPassword').value.trim();
+                brokerUrl.value = mqttData.brokerUrl || brokerUrl;
+                topic.value = mqttData.topic || topic;
+                account.value = mqttData.account || account;
+                password.value = mqttData.password || password;
+                console.log(brokerUrl);
+                const mqttWidgetModal = document.getElementById('mqttWidgetModal');
+                if (!brokerUrl || !topic || !account || !password) {
+                    alert('Broker URL, Topic, Account, and Password are required');
+                    return;
+                }
+                const widgetInfo = { brokerUrl, topic, account, password };
+                // Create MQTT client
+                const client = mqtt.connect(brokerUrl, {
+                    username: account,
+                    password: password
+                });
+                const widget = { brokerUrl, topic, account, password, statusJson: JSON.stringify({ connected: false }) };
+                mqttWidgets.push(widget);
+                mqttClients.push(client);
+                localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+                renderMqttWidgets();
+                client.on('connect', () => {
+                    widget.statusJson = JSON.stringify({ connected: true, lastMessage: '' });
+                    localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+                    renderMqttWidgets();
+                    client.subscribe(topic, (err) => {
+                        if (err) {
+                            widget.statusJson = JSON.stringify({ connected: false, error: 'Subscribe failed' });
+                            localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+                            renderMqttWidgets();
+                        }
+                    });
+                });
+
+                client.on('message', (t, message) => {
+                    if (t === topic) {
+                        widget.statusJson = JSON.stringify({ connected: true, lastMessage: message.toString() });
+                        localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+                        renderMqttWidgets();
+                    }
+                });
+
+                client.on('error', (err) => {
+                    widget.statusJson = JSON.stringify({ connected: false, error: err.message });
+                    localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+                    renderMqttWidgets();
+                });
+
+                document.getElementById('mqttWidgetModal').style.display = 'none';
+                document.getElementById('mqttBrokerUrl').value = '';
+                document.getElementById('mqttTopic').value = '';
+                document.getElementById('mqttAccount').value = '';
+                document.getElementById('mqttPassword').value = '';
+
+
+            }
+
             const div = document.createElement('div');
             div.className = 'widget';
             div.innerHTML = `
@@ -1504,6 +1686,87 @@
                 deviceManagementResult.style.color = '#dc3545';
             }
         });
+
+        // Show/hide modal logic remains unchanged
+        document.getElementById('addMqttWidgetBtn').onclick = () => {
+            document.getElementById('mqttWidgetModal').style.display = 'flex';
+        };
+        document.getElementById('cancelMqttWidgetBtn').onclick = () => {
+            document.getElementById('mqttWidgetModal').style.display = 'none';
+        };
+
+                // Connect and subscribe to MQTT when adding a widget
+        document.getElementById('saveMqttWidgetBtn').onclick = () => {
+            const brokerUrl = document.getElementById('mqttBrokerUrl').value.trim();
+            const topic = document.getElementById('mqttTopic').value.trim();
+            const account = document.getElementById('mqttAccount').value.trim();
+            const password = document.getElementById('mqttPassword').value.trim();
+            if (!brokerUrl || !topic || !account || !password) {
+                alert('Broker URL, Topic, Account, and Password are required');
+                return;
+            }
+            const widgetInfo = { brokerUrl, topic, account, password };
+
+
+            // You may want to generate a unique control_id or let the backend do it
+            fetch('/api/controls', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    device_id: selectedDeviceId, // or null if not linked to a device
+                    control_type: 'MQTT',
+                    control_name: `MQTT: ${topic}`,
+                    state: JSON.stringify(widgetInfo),
+                    // control_id: `mqtt_${Date.now()}_${Math.random().toString(36).slice(2,8)}`
+                    control_id: sensorSelect.value
+                })
+            });
+            // Create MQTT client
+            const client = mqtt.connect(brokerUrl, {
+                username: account,
+                password: password
+            });
+
+            const widget = { brokerUrl, topic, account, password, statusJson: JSON.stringify({ connected: false }) };
+            mqttWidgets.push(widget);
+            mqttClients.push(client);
+            localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+            renderMqttWidgets();
+
+            client.on('connect', () => {
+                widget.statusJson = JSON.stringify({ connected: true, lastMessage: '' });
+                localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+                renderMqttWidgets();
+                client.subscribe(topic, (err) => {
+                    if (err) {
+                        widget.statusJson = JSON.stringify({ connected: false, error: 'Subscribe failed' });
+                        localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+                        renderMqttWidgets();
+                    }
+                });
+            });
+
+            client.on('message', (t, message) => {
+                if (t === topic) {
+                    widget.statusJson = JSON.stringify({ connected: true, lastMessage: message.toString() });
+                    localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+                    renderMqttWidgets();
+                }
+            });
+
+            client.on('error', (err) => {
+                widget.statusJson = JSON.stringify({ connected: false, error: err.message });
+                localStorage.setItem('mqttWidgets', JSON.stringify(mqttWidgets));
+                renderMqttWidgets();
+            });
+
+            document.getElementById('mqttWidgetModal').style.display = 'none';
+            document.getElementById('mqttBrokerUrl').value = '';
+            document.getElementById('mqttTopic').value = '';
+            document.getElementById('mqttAccount').value = '';
+            document.getElementById('mqttPassword').value = '';
+        };
+
     }
 
     // Function to update user devices list display
