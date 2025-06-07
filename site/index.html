@@ -1377,7 +1377,11 @@
                 });
                 if (resp.ok) {
                     w.state = newState;
-                    renderWidgets();
+                    // Only update the current widget instead of reloading everything
+                    div.querySelector('.toggleBtn').textContent = newState === 'on' ? 'OFF' : 'ON';
+                    div.querySelector('p strong').textContent = newState;
+                    // Don't call loadWidgets() here as it would recreate all MQTT widgets
+
                 } else {
                     alert('Update failed');
                 }
@@ -1953,7 +1957,14 @@
         const widget = widgets.find(w => w.control_id === control_id);
         if (widget) {
             widget.state = state;
-            renderWidgets();
+            // Only update the widget that changed, don't reload everything
+            const widgetElement = document.querySelector(`.widget button[data-id="${control_id}"]`).closest('.widget');
+            if (widgetElement) {
+                const toggleBtn = widgetElement.querySelector('.toggleBtn');
+                const stateDisplay = widgetElement.querySelector('p strong');
+                if (toggleBtn) toggleBtn.textContent = state === 'on' ? 'OFF' : 'ON';
+                if (stateDisplay) stateDisplay.textContent = state;
+            }
         }
     }
 
