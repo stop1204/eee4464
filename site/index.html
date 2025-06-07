@@ -426,13 +426,28 @@
             <div>Last Message: ${status.lastMessage || status.error || ''}</div>
         `;
         div.querySelector('.closeBtn').onclick = () => {
+
+
             // Disconnect client if exists
             if (mqttClients[idx]) {
                 mqttClients[idx].end(true);
                 mqttClients[idx] = null;
             }
             mqttWidgets.splice(idx, 1);
-            renderMqttWidgets();
+
+
+            widgets = widgets.filter(x => x.control_id !== w.control_id);
+            fetch('/api/controls?control_id=' + w.control_id, {
+                method: 'DELETE'
+            }).then(resp => {
+                if (resp.ok) {
+                    renderMqttWidgets();
+
+                } else {
+                    alert('Delete failed');
+                }
+            });
+
         };
         container.appendChild(div);
     });
@@ -466,14 +481,14 @@
             fetchNewSensorData();
 
 
-            mqttWidgets.forEach(w => {
-                // Simulate a new message
-                w.statusJson = JSON.stringify({
-                    connected: true,
-                    lastMessage: 'Random: ' + Math.random().toString(36).substring(2, 8)
-                });
-            });
-            renderMqttWidgets();
+            // mqttWidgets.forEach(w => {
+            //     // Simulate a new message
+            //     w.statusJson = JSON.stringify({
+            //         connected: true,
+            //         lastMessage: 'Random: ' + Math.random().toString(36).substring(2, 8)
+            //     });
+            // });
+            // renderMqttWidgets();
         }, Number(autoRefreshIntervalInput.value) * 1000);
 
 
@@ -1340,7 +1355,6 @@
                         alert('Delete failed');
                     }
                 });
-                renderWidgets();
             };
             div.querySelector('.toggleBtn').onclick = async () => {
                 const newState = w.state === 'on' ? 'off' : 'on';
