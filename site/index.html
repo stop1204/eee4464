@@ -1499,29 +1499,15 @@
         document.getElementById('btnAddDevice').addEventListener('click', addTestDevice);
 
         document.getElementById('btnAddControl').addEventListener('click', async () => {
-            if (!lastDeviceId) {
-                lastDeviceId = await addTestDevice();
-            }
-            if (!lastSensorId) {
-                lastDeviceId = await addTestSensor();
-            }
-
-            await addTestControl(lastDeviceId);
+            await addTestControl();
         });
 
         document.getElementById('btnAddSensor').addEventListener('click', async () => {
-            if (!lastDeviceId) {
-                lastDeviceId = await addTestDevice();
-            }
-            await addTestSensor(lastDeviceId);
+            await addTestSensor();
         });
 
         document.getElementById('btnAddSensorData').addEventListener('click', async () => {
-            if (!lastSensorId) {
-                alert('Please add a sensor first');
-                return;
-            }
-            await addTestSensorData(lastSensorId);
+            await addTestSensorData();
         });
 
         document.getElementById('btnAddAll').addEventListener('click', addTestAll);
@@ -1843,18 +1829,29 @@
         return data.insertedId;
     }
 
-    async function addTestControl(deviceId) {
+    async function addTestControl(deviceId = null) {
+        // Use the selected device and sensor if not provided
+        deviceId = deviceId || getSelectedTestDeviceId();
+        const sensorId = getSelectedTestSensorId();
+        
         if (!deviceId) {
             alert('Please add or select a device first');
             return;
         }
+        
+        if (!sensorId) {
+            alert('Please add or select a sensor first');
+            return;
+        }
+        
         const testControl = {
             device_id: deviceId,
-            control_id: lastSensorId,
+            control_id: sensorId,
             control_type: 'button',
             control_name: 'Test Control',
             state: 'off'
         };
+        
         const res = await fetch('/api/controls', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -1866,16 +1863,20 @@
             return null;
         }
         localStorage.setItem('lastControlId', data.control_id);
-        lastControlId= data.control_id;
+        lastControlId = data.control_id;
         alert('Added control ID: ' + data.control_id);
         return data.control_id;
     }
 
-    async function addTestSensor(deviceId) {
+    async function addTestSensor(deviceId = null) {
+        // Use the selected device if not provided
+        deviceId = deviceId || getSelectedTestDeviceId();
+        
         if (!deviceId) {
             alert('Please add or select a device first');
             return;
         }
+        
         const testSensor = {
             device_id: deviceId,
             sensor_type: 'temperature',
@@ -1898,11 +1899,15 @@
         return data.sensor_id;
     }
 
-    async function addTestSensorData(sensorId) {
+    async function addTestSensorData(sensorId = null) {
+        // Use the selected sensor if not provided
+        sensorId = sensorId || getSelectedTestSensorId();
+        
         if (!sensorId) {
             alert('Please add or select a sensor first');
             return;
         }
+        
         const testData = {
             sensor_id: sensorId,
             timestamp: Math.floor(Date.now() / 1000),
@@ -1926,12 +1931,23 @@
     async function addTestAll() {
         const deviceId = await addTestDevice();
         if (!deviceId) return;
-        const controlId = await addTestControl(deviceId);
         const sensorId = await addTestSensor(deviceId);
+        if (!sensorId) return;
+        const controlId = await addTestControl(deviceId);
         if (sensorId) {
             await addTestSensorData(sensorId);
         }
-        alert('Add datas successfully!');
+        alert('Add data successfully!');
+    }
+
+    function getSelectedTestDeviceId() {
+        const selectedRadio = document.querySelector('input[name="testDeviceRadio"]:checked');
+        return selectedRadio ? selectedRadio.value : null;
+    }
+
+    function getSelectedTestSensorId() {
+        const selectedRadio = document.querySelector('input[name="testSensorRadio"]:checked');
+        return selectedRadio ? selectedRadio.value : null;
     }
 
     function saveSettingsToLocal() {
@@ -2056,26 +2072,30 @@
             tab.classList.add('active');
             contents.forEach(c => c.classList.remove('active'));
             document.getElementById(tab.dataset.tab).classList.add('active');
-
-            // Show lastDeviceId beside testDelete button when Test tab is active
-            if (tab.dataset.tab === 'test') {
-                loadTestDeviceList();
-                updateUserDevicesList(); // Update user devices list when switching to Test tab
-            }
         });
     });
 
-
-
-    // Generate colors for pie/doughnut charts
     function pieColors(count) {
         const baseColors = [
             '#0e838f', '#8a2be2', '#ff7f50', '#ffdc34', '#0ecb81', '#c74e4e', '#bc7af9',
             '#f08a5d', '#f9ed69', '#3ec1d3', '#ffb6b9', '#283c63'
         ];
-        return Array(count).fill(0).map((_, i) => baseColors[i % baseColors.length]);
+        return Array.from({length: count}, (_, i) => baseColors[i % baseColors.length]);
     }
+    
+    // Initialize the dashboard when document is loaded
+    if (document.readyState === 'complete') {
+        checkLoginState();
+        loadTestDeviceList();
+    } else {
+        document.addEventListener('DOMContentLoaded', () => {
+            updateUserDevicesList();
+            loadTestDeviceList();
+        });
+    }
+
+    startAutoRefresh();
+
 </script>
 </body>
 </html>
-``` 
