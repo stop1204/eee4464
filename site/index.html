@@ -1253,6 +1253,17 @@
             widgetContainer.innerHTML = 'Please select a device first';
             return;
         }
+        
+        // Disconnect all MQTT clients and clear existing MQTT widgets
+        mqttClients.forEach(client => {
+            if (client) {
+                client.end(true);
+            }
+        });
+        mqttClients = [];
+        mqttWidgets = [];
+        renderMqttWidgets(); // Clear the MQTT widgets UI
+        
         const res = await fetch(`/api/controls?device_id=${selectedDeviceId}`);
         const controls = await res.json();
         widgets = controls.map(ctrl => {
@@ -2067,3 +2078,4 @@
 </script>
 </body>
 </html>
+``` 
