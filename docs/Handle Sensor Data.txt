@@ -1,0 +1,38 @@
+@startuml
+start
+:Receive HTTP request;
+switch (request.method)
+case (GET)
+  :Get params\n`sensor_id`, `start`, `end`, `limit`, `offset`;
+  if (sensor_id missing?) then (yes)
+    :Return 400 "Missing sensor_id";
+    stop
+  endif
+  :Build SQL query\nwith optional time range;
+  :Execute `SELECT` on D1;
+  :Return JSON results;
+case (POST)
+  :Parse JSON body\n`sensor_id`, `timestamp`, `data`;
+  if (sensor_id or data missing?) then (yes)
+    :Return 400;
+    stop
+  endif
+  :Parse `data` JSON;
+  if (timestamp not provided?) then (yes)
+     :Use `strftime('%s','now')`;
+  endif
+  :INSERT into `sensor_data`;
+  :Return inserted `data_id`;
+case (DELETE)
+  :Read `sensor_id` param;
+  if (sensor_id missing?) then (yes)
+    :Return 400;
+    stop
+  endif
+  :DELETE rows by sensor_id;
+  :Return deleted count;
+
+  :Return 405 "Method Not Allowed";
+endswitch
+stop
+@enduml

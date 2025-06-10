@@ -1,0 +1,22 @@
+@startuml
+start
+:Open index.html;
+:User login via `/api/login`;
+if (Login success?) then (yes)
+  :Store session token;\nLoad devices via `/api/device`;
+else
+  stop
+endif
+:User selects device;
+:Load sensors `/api/sensors`;
+:User selects sensors & time range;
+repeat
+  :Fetch sensor data `/api/sensor_data`;
+  :Render chart (Chart.js);
+  if (User toggles control?) then (yes)
+    :Send command `/api/controls` & `/api/messages`;
+  endif
+  :Wait/auto refresh;
+repeat while (session active)
+stop
+@enduml

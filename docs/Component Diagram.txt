@@ -1,0 +1,23 @@
+@startuml
+package "Client Browser" {
+    [index.html] as Index
+    [Chart.js Library] as Chart
+    [MQTT.js] as MQTT
+}
+
+package "Server" {
+    [Cloudflare Worker API] as Worker
+    [D1 Database] as DB
+}
+
+package "External" {
+    [MQTT Broker]
+}
+
+Index --> Worker : HTTP Requests\n(JSON API)
+Worker --> DB : SQL Queries
+Chart ..> Index
+MQTT ..> [MQTT Broker] : connect & subscribe
+Index ..> MQTT : for live messages
+
+@enduml
