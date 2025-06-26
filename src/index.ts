@@ -18,9 +18,10 @@ __name(sha256, "sha256");
 // src/index.ts
 var index_default = {
   async fetch(request: Request, env: { DB: D1Database; }, _ctx: ExecutionContext) {
-    const url = new URL(request.url);
-    const { pathname, searchParams } = url;
-    const db = env.DB;
+    try {
+      const url = new URL(request.url);
+      const { pathname, searchParams } = url;
+      const db = env.DB;
 
     if (pathname.startsWith('/api/login')) return handleLogin(request, db);
     if (pathname.startsWith('/api/register')) return handleRegister(request, db);
@@ -33,11 +34,18 @@ var index_default = {
     if (pathname.startsWith('/api/controls')) return handleControls(request, db, searchParams);
     if (pathname.startsWith('/api/messages')) return handleMessages(request, db, searchParams);
 
-    return new Response(renderHtml(), {
-      headers: {
-        "content-type": "text/html"
-      }
-    });
+      return new Response(renderHtml(), {
+        headers: {
+          "content-type": "text/html"
+        }
+      });
+    } catch (err) {
+      console.error('Unhandled error in fetch:', err);
+      return new Response(JSON.stringify({ success: false, message: 'Internal Server Error' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
   }
 };
 export {

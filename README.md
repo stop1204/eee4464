@@ -63,6 +63,7 @@ https://sourceforge.net/projects/gnuwin32/files/latest/download
 4. Deploy the project!
    ```bash
    npx wrangler deploy
+Be mindful of potential rate limiting on your Worker and secure the API (e.g. with authentication) before exposing it publicly.
    ```
 ## Local Development
 To run this project locally, you can use the `wrangler dev` command:
@@ -77,3 +78,5 @@ wrangler dev --remote
 This will start a local server that simulates the Worker environment, allowing you to test your Worker and D1 database interactions.
 ## License
 This project is licensed under the [MIT License](lICENSE).
+## \ud83d\udcda API Reference
+For full API details see [API_REFERENCE.md](API_REFERENCE.md).
