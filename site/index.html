@@ -180,6 +180,16 @@
         }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 6px 8px; }
+        #mqttRealtime {
+            background: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            margin-top: 20px;
+            max-width: 400px;
+        }
+        #mqttRealtime div { margin-bottom: 4px; }
+        #mqttRealtime label { display:flex; align-items:center; gap:8px; }
     </style>
 </head>
 <body>
@@ -257,6 +267,17 @@
                 </select>
             </div>
             <canvas id="sensorDataChart" width="800" height="400" style="max-width: 800px; height: 400px;"></canvas>
+            <div id="mqttRealtime">
+                <h3>Live MQTT Data</h3>
+                <div>Temperature: <span id="mqttTemperature">--</span> °C</div>
+                <div>Humidity: <span id="mqttHumidity">--</span> %</div>
+                <div>Soil Moisture: <span id="mqttSoil">--</span></div>
+                <div>Light: <span id="mqttLight">--</span></div>
+                <div>Motion: <span id="mqttMotion">--</span></div>
+                <div>Current: <span id="mqttCurrent">--</span> A</div>
+                <div>Heart Rate: <span id="mqttHeart">--</span> bpm</div>
+                <label>Pump <input type="checkbox" id="pumpSwitch" /></label>
+            </div>
         </section>
          <div id="mqttWidgetModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.3); align-items:center; justify-content:center; z-index:1000;">
                         <div style="background:white; padding:20px; border-radius:10px; min-width:300px;">
@@ -406,6 +427,17 @@
 
     let mqttWidgets = JSON.parse('[]');
     let mqttClients = [];
+    let mqttClient = null;
+    const mqttElements = {
+        temperature: document.getElementById('mqttTemperature'),
+        humidity: document.getElementById('mqttHumidity'),
+        soil: document.getElementById('mqttSoil'),
+        light: document.getElementById('mqttLight'),
+        motion: document.getElementById('mqttMotion'),
+        current: document.getElementById('mqttCurrent'),
+        heart_rate: document.getElementById('mqttHeart'),
+        pump: document.getElementById('pumpSwitch')
+    };
 
     function renderMqttWidgets() {
     const container = document.getElementById('mqttWidgetsContainer');
@@ -510,6 +542,54 @@
             messageCheckInterval = null;
             console.log('Message checker stopped');
         }
+    }
+
+    function connectMqtt() {
+        const url = 'wss://6bdeb9e091414b898b8a01d7ab63bcd2.s1.eu.hivemq.cloud:8884/mqtt';
+        mqttClient = mqtt.connect(url);
+        const topics = ['temperature','humidity','soil','pump','light','motion','current','heart_rate'];
+        mqttClient.on('connect', () => {
+            topics.forEach(t => mqttClient.subscribe(`iot/${t}`));
+        });
+        mqttClient.on('message', (topic, msg) => {
+            try {
+                const data = JSON.parse(msg.toString());
+                switch(topic) {
+                    case 'iot/temperature':
+                        mqttElements.temperature.textContent = data.temperature;
+                        break;
+                    case 'iot/humidity':
+                        mqttElements.humidity.textContent = data.humidity;
+                        break;
+                    case 'iot/soil':
+                        mqttElements.soil.textContent = data.moisture;
+                        break;
+                    case 'iot/light':
+                        mqttElements.light.textContent = data.light;
+                        break;
+                    case 'iot/motion':
+                        mqttElements.motion.textContent = data.motion_detected;
+                        break;
+                    case 'iot/current':
+                        mqttElements.current.textContent = data.current;
+                        break;
+                    case 'iot/heart_rate':
+                        mqttElements.heart_rate.textContent = data.heart_rate;
+                        break;
+                    case 'iot/pump':
+                        mqttElements.pump.checked = !!data.pump_state;
+                        break;
+                }
+            } catch(e) {
+                console.error('MQTT parse error', e);
+            }
+        });
+        mqttElements.pump.addEventListener('change', () => {
+            if (mqttClient && mqttClient.connected) {
+                const val = mqttElements.pump.checked ? 1 : 0;
+                mqttClient.publish('iot/pump', JSON.stringify({ pump_state: val }));
+            }
+        });
     }
 
     // --- init ---
@@ -2089,10 +2169,12 @@
     if (document.readyState === 'complete') {
         checkLoginState();
         loadTestDeviceList();
+        connectMqtt();
     } else {
         document.addEventListener('DOMContentLoaded', () => {
             updateUserDevicesList();
             loadTestDeviceList();
+            connectMqtt();
         });
     }
 

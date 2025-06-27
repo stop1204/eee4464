@@ -46,6 +46,13 @@ var index_default = {
         headers: { 'Content-Type': 'application/json' }
       });
     }
+  },
+  async pubsub(message: any, env: { DB: D1Database; }, _ctx: ExecutionContext) {
+    try {
+      await handlePubSubMessage(message, env.DB);
+    } catch (err) {
+      console.error('Error handling Pub/Sub message:', err);
+    }
   }
 };
 export {
@@ -676,6 +683,47 @@ async function handleMessages(request, db, searchParams) {
   }
 
   return text('Method Not Allowed', 405);
+}
+
+// Handle incoming MQTT messages via Cloudflare Pub/Sub
+async function handlePubSubMessage(message: any, db: D1Database) {
+  try {
+    const topic = (message.topic || '').toString();
+    let payloadStr = '';
+    if (typeof message.payload === 'string') {
+      payloadStr = message.payload;
+    } else if (message.payload instanceof ArrayBuffer || ArrayBuffer.isView(message.payload)) {
+      payloadStr = new TextDecoder().decode(message.payload as ArrayBuffer);
+    }
+    if (!payloadStr) return;
+
+    const sensorType = topic.replace(/^iot\//, '');
+    const dataJson = JSON.parse(payloadStr);
+    const sensorId = await getOrCreateSensor(db, sensorType);
+    const ts = Math.floor(Date.now() / 1000);
+    await db.prepare(
+      'INSERT INTO sensor_data (sensor_id, timestamp, data) VALUES (?, ?, ?)'
+    ).bind(sensorId, ts, JSON.stringify(dataJson)).run();
+  } catch (e) {
+    console.error('Failed to store PubSub data:', e);
+  }
+}
+
+// Retrieve existing device or create a default one
+async function getDefaultDevice(db: D1Database) {
+  const existing = await db.prepare('SELECT device_id FROM device ORDER BY device_id LIMIT 1').first();
+  if (existing) return existing.device_id as number;
+  const ins = await db.prepare('INSERT INTO device (device_name) VALUES (?)').bind('default').run();
+  return ins.meta.last_row_id as number;
+}
+
+// Retrieve sensor by type or create if missing
+async function getOrCreateSensor(db: D1Database, type: string) {
+  const deviceId = await getDefaultDevice(db);
+  const sensor = await db.prepare('SELECT sensor_id FROM sensors WHERE device_id = ? AND sensor_type = ?').bind(deviceId, type).first();
+  if (sensor) return sensor.sensor_id as number;
+  const ins = await db.prepare('INSERT INTO sensors (device_id, sensor_type, sensor_name) VALUES (?, ?, ?)').bind(deviceId, type, type).run();
+  return ins.meta.last_row_id as number;
 }
 
 // @ts-ignore
