@@ -75,5 +75,17 @@ or
 wrangler dev --remote
 ```
 This will start a local server that simulates the Worker environment, allowing you to test your Worker and D1 database interactions.
+
+## MQTT Integration
+
+The worker subscribes to a set of HiveMQ topics to ingest sensor data. Configure the following environment variables in your `wrangler.toml` or through the Cloudflare dashboard:
+
+```
+MQTT_BROKER_URL   # e.g. wss://broker.example.com:8884
+MQTT_USERNAME     # broker account name
+MQTT_PASSWORD     # broker password
+```
+
+Incoming messages on topics like `iot/temperature` or `iot/humidity` are parsed as JSON and stored in the `sensor_data` table. When the pump control widget is toggled, the new state is also published to `iot/pump`.
 ## License
 This project is licensed under the [MIT License](lICENSE).
