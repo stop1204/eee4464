@@ -553,6 +553,7 @@
             username: 'eee4464',
             password: 'Eee4464iot'
         });
+
         const topics = ['temperature','humidity','soil','pump','light','motion','current','heart_rate'];
         mqttClient.on('connect', () => {
             topics.forEach(t => mqttClient.subscribe(`iot/${t}`));
@@ -591,11 +592,13 @@
             }
         });
         mqttElements.pump.onchange = () => {
+
             if (mqttClient && mqttClient.connected) {
                 const val = mqttElements.pump.checked ? 1 : 0;
                 mqttClient.publish('iot/pump', JSON.stringify({ pump_state: val }));
             }
         };
+
     }
 
     // --- init ---
