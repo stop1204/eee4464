@@ -79,5 +79,6 @@ This will start a local server that simulates the Worker environment, allowing y
 ## MQTT Integration
 
 The dashboard uses the browser-based [mqtt.js](https://github.com/mqttjs/MQTT.js) client to subscribe to topics such as `iot/temperature` and `iot/humidity`. Provide your broker URL and credentials in the dashboard when adding an MQTT widget. Pump state changes are also published to `iot/pump` directly from the browser.
+
 ## License
 This project is licensed under the [MIT License](LICENSE).

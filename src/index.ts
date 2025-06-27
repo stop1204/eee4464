@@ -1,4 +1,5 @@
 import { renderHtml } from './resp.js';
+import { initMqtt, publishPumpState } from './mqtt.js';
 
 
 var __defProp = Object.defineProperty;
@@ -22,6 +23,8 @@ var index_default = {
     const url = new URL(request.url);
     const { pathname, searchParams } = url;
     const db = env.DB;
+    // Initialize MQTT connection if not already connected
+    initMqtt(env as unknown as Env, db);
 
 
     if (pathname.startsWith('/api/login')) return handleLogin(request, db);
@@ -32,7 +35,7 @@ var index_default = {
     if (pathname.startsWith('/api/device')) return handleDevice(request, db, searchParams);
     if (pathname.startsWith('/api/sensors')) return handleSensors(request, db, searchParams);
     if (pathname.startsWith('/api/sensor_data')) return handleSensorData(request, db, searchParams);
-    if (pathname.startsWith('/api/controls')) return handleControls(request, db, searchParams);
+    if (pathname.startsWith('/api/controls')) return handleControls(request, db, searchParams, env as unknown as Env);
     if (pathname.startsWith('/api/messages')) return handleMessages(request, db, searchParams);
 
     return new Response(renderHtml(), {
@@ -594,7 +597,7 @@ async function handleSensorData(request, db, searchParams) {
 }
 
 // @ts-ignore
-async function handleControls(request, db, searchParams) {
+async function handleControls(request, db, searchParams, env) {
   if (request.method === 'GET') {
     const device_id = searchParams.get('device_id');
     if (!device_id) return text('Missing device_id', 400);
@@ -628,6 +631,11 @@ async function handleControls(request, db, searchParams) {
       UPDATE controls SET state = ?, updated_at = strftime('%s','now')
       WHERE control_id = ?
     `).bind(state, control_id).run();
+
+    const ctrl = await db.prepare('SELECT control_name, control_type FROM controls WHERE control_id = ?').bind(control_id).first();
+    if (ctrl && ((ctrl.control_name && ctrl.control_name.toLowerCase().includes('pump')) || (ctrl.control_type && ctrl.control_type.toLowerCase().includes('pump')))) {
+      publishPumpState(state);
+    }
 
     return json({ changes: update.changes });
   }
