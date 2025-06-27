@@ -546,7 +546,14 @@
 
     function connectMqtt() {
         const url = 'wss://6bdeb9e091414b898b8a01d7ab63bcd2.s1.eu.hivemq.cloud:8884/mqtt';
-        mqttClient = mqtt.connect(url);
+        if (mqttClient) {
+            try { mqttClient.end(true); } catch (e) { console.error('MQTT end error', e); }
+        }
+        mqttClient = mqtt.connect(url, {
+            username: 'eee4464',
+            password: 'Eee4464iot'
+        });
+
         const topics = ['temperature','humidity','soil','pump','light','motion','current','heart_rate'];
         mqttClient.on('connect', () => {
             topics.forEach(t => mqttClient.subscribe(`iot/${t}`));
@@ -584,12 +591,14 @@
                 console.error('MQTT parse error', e);
             }
         });
-        mqttElements.pump.addEventListener('change', () => {
+        mqttElements.pump.onchange = () => {
+
             if (mqttClient && mqttClient.connected) {
                 const val = mqttElements.pump.checked ? 1 : 0;
                 mqttClient.publish('iot/pump', JSON.stringify({ pump_state: val }));
             }
-        });
+        };
+
     }
 
     // --- init ---
