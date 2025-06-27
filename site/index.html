@@ -271,7 +271,7 @@
                 <h3>Live MQTT Data</h3>
                 <div>Temperature: <span id="mqttTemperature">--</span> °C</div>
                 <div>Humidity: <span id="mqttHumidity">--</span> %</div>
-                <div>Soil Moisture: <span id="mqttSoil">--</span></div>
+                <div>Soil Moisture: <span id="mqttMoisture">--</span></div>
                 <div>Light: <span id="mqttLight">--</span></div>
                 <div>Motion: <span id="mqttMotion">--</span></div>
                 <div>Current: <span id="mqttCurrent">--</span> A</div>
@@ -431,7 +431,7 @@
     const mqttElements = {
         temperature: document.getElementById('mqttTemperature'),
         humidity: document.getElementById('mqttHumidity'),
-        soil: document.getElementById('mqttSoil'),
+        moisture: document.getElementById('mqttMoisture'),
         light: document.getElementById('mqttLight'),
         motion: document.getElementById('mqttMotion'),
         current: document.getElementById('mqttCurrent'),
@@ -553,7 +553,8 @@
             username: 'eee4464',
             password: 'Eee4464iot'
         });
-        const topics = ['temperature','humidity','soil','moisture','pump','light','motion','current','heart_rate'];
+        const topics = ['temperature','humidity','moisture','pump','light','motion','current','heart_rate'];
+
         mqttClient.on('connect', () => {
             topics.forEach(t => mqttClient.subscribe(`iot/${t}`));
         });
@@ -567,12 +568,13 @@
                     case 'iot/humidity':
                         mqttElements.humidity.textContent = data.humidity;
                         break;
-                    case 'iot/soil':
+                
+
                     case 'iot/moisture':
                         if (data.moisture !== undefined) {
-                            mqttElements.soil.textContent = data.moisture;
+                            mqttElements.moisture.textContent = data.moisture;
                         } else {
-                            mqttElements.soil.textContent = JSON.stringify(data);
+                            mqttElements.moisture.textContent = JSON.stringify(data);
                         }
                         break;
                     case 'iot/light':
@@ -583,6 +585,7 @@
                         } else {
                             mqttElements.light.textContent = JSON.stringify(data);
                         }
+
                         break;
                     case 'iot/motion':
                         mqttElements.motion.textContent = data.motion_detected;
@@ -597,22 +600,26 @@
                         mqttElements.pump.checked = !!data.pump_state;
                         break;
                 }
+
                 // store data to the database via HTTP
                 fetch('/api/ingest_mqtt', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ topic, data })
                 }).catch(err => console.error('store mqtt', err));
+
             } catch(e) {
                 console.error('MQTT parse error', e);
             }
         });
         mqttElements.pump.onchange = () => {
+
             if (mqttClient && mqttClient.connected) {
                 const val = mqttElements.pump.checked ? 1 : 0;
                 mqttClient.publish('iot/pump', JSON.stringify({ pump_state: val }));
             }
         };
+
     }
 
     // --- init ---

@@ -686,6 +686,7 @@ async function handleMessages(request, db, searchParams) {
   return text('Method Not Allowed', 405);
 }
 
+
 // Handle MQTT data pushed from the frontend
 async function handleIngestMqtt(request: Request, db: D1Database) {
   if (request.method !== 'POST') return text('Method Not Allowed', 405);
@@ -701,6 +702,7 @@ async function handleIngestMqtt(request: Request, db: D1Database) {
     return json({ success: false, message: 'Failed to store data' }, 500);
   }
 }
+
 
 // Handle incoming MQTT messages via Cloudflare Pub/Sub
 async function handlePubSubMessage(message: any, db: D1Database) {
