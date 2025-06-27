@@ -404,6 +404,28 @@
 
     let mqttWidgets = JSON.parse('[]');
     let mqttClients = [];
+    const pumpMqttConfig = {
+        brokerUrl: localStorage.getItem('pumpMqttBroker') || '',
+        account: localStorage.getItem('pumpMqttAccount') || '',
+        password: localStorage.getItem('pumpMqttPassword') || ''
+    };
+    let pumpMqttClient = null;
+    function connectPumpMqtt(){
+        if(pumpMqttClient) return pumpMqttClient;
+        if(!pumpMqttConfig.brokerUrl) return null;
+        pumpMqttClient = mqtt.connect(pumpMqttConfig.brokerUrl, {
+            username: pumpMqttConfig.account,
+            password: pumpMqttConfig.password
+        });
+        pumpMqttClient.on('error', err => console.log('pump mqtt error', err));
+        return pumpMqttClient;
+    }
+    function publishPumpState(state){
+        const client = connectPumpMqtt();
+        if(client && client.connected){
+            client.publish('iot/pump', JSON.stringify({ pump_state: state === 'on' ? 1 : 0 }));
+        }
+    }
 
     function renderMqttWidgets() {
     const container = document.getElementById('mqttWidgetsContainer');
@@ -1387,6 +1409,10 @@
                     body: JSON.stringify({state: newState})
                 });
                 if (resp.ok) {
+                    if ((w.control_name && w.control_name.toLowerCase().includes('pump')) ||
+                        (w.control_type && w.control_type.toLowerCase().includes('pump'))){
+                        publishPumpState(newState);
+                    }
                     w.state = newState;
                     // Only update the current widget instead of reloading everything
                     div.querySelector('.toggleBtn').textContent = newState === 'on' ? 'OFF' : 'ON';

@@ -1,5 +1,6 @@
 import { renderHtml } from './resp.js';
 
+
 var __defProp = Object.defineProperty;
 var __name = (target: (content: any) => string, value: string) => __defProp(target, "name", { value, configurable: true });
 
@@ -21,6 +22,7 @@ var index_default = {
     const url = new URL(request.url);
     const { pathname, searchParams } = url;
     const db = env.DB;
+
 
     if (pathname.startsWith('/api/login')) return handleLogin(request, db);
     if (pathname.startsWith('/api/register')) return handleRegister(request, db);
