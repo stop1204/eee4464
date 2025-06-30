@@ -33,6 +33,7 @@ var index_default = {
     if (pathname.startsWith('/api/sensor_data')) return handleSensorData(request, db, searchParams);
     if (pathname.startsWith('/api/controls')) return handleControls(request, db, searchParams);
     if (pathname.startsWith('/api/messages')) return handleMessages(request, db, searchParams);
+    if (pathname.startsWith('/api/ingest_mqtt')) return handleIngestMqtt(request, db);
 
       return new Response(renderHtml(), {
         headers: {
@@ -684,6 +685,24 @@ async function handleMessages(request, db, searchParams) {
 
   return text('Method Not Allowed', 405);
 }
+
+
+// Handle MQTT data pushed from the frontend
+async function handleIngestMqtt(request: Request, db: D1Database) {
+  if (request.method !== 'POST') return text('Method Not Allowed', 405);
+  try {
+    const body: any = await request.json();
+    const { topic, data } = body;
+    if (!topic || !data) return json({ success: false, message: 'Missing topic or data' }, 400);
+    const payload = typeof data === 'string' ? data : JSON.stringify(data);
+    await handlePubSubMessage({ topic, payload }, db);
+    return json({ success: true });
+  } catch (e) {
+    console.error('Failed to ingest MQTT data:', e);
+    return json({ success: false, message: 'Failed to store data' }, 500);
+  }
+}
+
 
 // Handle incoming MQTT messages via Cloudflare Pub/Sub
 async function handlePubSubMessage(message: any, db: D1Database) {
