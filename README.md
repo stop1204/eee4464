@@ -73,6 +73,6 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## Contact
 Author: Terry He & Karen  
-Email: <230263367@stu.vtc.edu.hk.com>
+Email: <230263367@stu.vtc.edu.hk>
 
 For detailed API endpoints see [API_REFERENCE.md](API_REFERENCE.md).
