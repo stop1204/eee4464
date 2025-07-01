@@ -1,82 +1,78 @@
-# Cloudflare Worker IoT Dashboard with D1
+# EEE4464 IoT Dashboard
 
-This project is an IoT platform for managing devices, collecting and visualizing sensor data, and controlling device states, all powered by Cloudflare Workers and D1. It features a frontend dashboard for easy interaction.
+A lightweight IoT platform built with **Cloudflare Workers** and **D1**. It provides REST APIs and a web dashboard for managing devices, storing sensor data and sending control messages.
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/templates/tree/main/d1-template) <!-- TODO: Update this deploy button URL if the template location changes -->
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/templates/tree/main/d1-template)
 
-<!-- ![Worker + D1 Template Preview](https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/cb7cb0a9-6102-4822-633c-b76b7bb25900/public) -->
-<!-- TODO: Add a new preview image relevant to the IoT dashboard -->
+## Features
+- Cloudflare Worker backend with a D1 database
+- Real-time sensor ingestion via HTTP or MQTT
+- Dashboard interface using Chart.js for data visualisation
+- User login/registration and device management
+- Endpoints for controls and message logging
 
-<!-- dash-content-start -->
-
-D1 is Cloudflare's native serverless SQL database ([docs](https://developers.cloudflare.com/d1/)). This project utilizes D1 to store device information, sensor readings, and control states. The Cloudflare Worker provides the API backend, and a web-based frontend allows for data visualization and device management.
-
-The database schema is defined by several migration files in the `migrations/` directory, creating tables such as `device`, `sensors`, `sensor_data`, `controls`, and `message`.
-
-> [!IMPORTANT]
-> When using C3 to create this project (if applicable, this template might be used directly), select "no" when it asks if you want to deploy. You need to follow this project's [setup steps](#setup-steps) before deploying.
-
-<!-- dash-content-end -->
-
-## TODO
-
-*   Enhance charting options (e.g., real-time updates via WebSockets).
-*   Implement user authentication for the dashboard.
-*   Add more comprehensive API documentation (e.g., OpenAPI spec).
-*   Refactor backend code for better modularity.
-*   Improve error handling and user feedback in the frontend.
-
-## Getting Started
-
-Outside of this repo, you can start a new project with this template using [C3](https://developers.cloudflare.com/pages/get-started/c3/) (the `create-cloudflare` CLI):
-
+## Directory Structure
 ```
-npm create cloudflare@latest -- --template=YOUR_TEMPLATE_PATH_HERE # TODO: Update this if it becomes a C3 template
-```
-GNUWin32 (Makefile tools)
-``` 
-https://sourceforge.net/projects/gnuwin32/files/latest/download
+./src        Worker TypeScript source
+./site       Static frontend served by the Worker
+./migrations SQL schema for the D1 database
+./data       Example scripts and data plots
+./docs       Architecture diagrams
 ```
 
-<!-- A live public deployment of this template is available at [https://d1-template.templates.workers.dev](https://d1-template.templates.workers.dev) -->
-<!-- TODO: Update with the new deployment URL once available -->
+## Requirements
+- Node.js and npm
+- [Wrangler](https://developers.cloudflare.com/workers/wrangler/) CLI
+- Access to Cloudflare D1
 
-## Setup Steps
-
-1. Install the project dependencies with a package manager of your choice:
+## Quick Start
+1. Install dependencies
    ```bash
    npm install
    npm install -g wrangler
    wrangler login
    ```
-2. Create a [D1 database](https://developers.cloudflare.com/d1/get-started/) (e.g., "iot_dashboard_db"):
+2. Create a D1 database
    ```bash
-   npx wrangler d1 create iot_dashboard_db
+   npx wrangler d1 create eee4464
    ```
-   ...and update the `database_id` field in `wrangler.toml` (or `wrangler.json` if you are using that) with the new database ID.
-   **Note:** The `database_name` in `wrangler.toml` should also match the name you choose (e.g., "iot_dashboard_db").
-3. Run the database migrations to set up the complete schema. This project contains multiple migration files (from `0001_...` to `0006_...`) in the `migrations/` directory which will create all necessary tables (`device`, `sensors`, `sensor_data`, `controls`, `message`, etc.).
+   Update `wrangler.json` with the new `database_id` if necessary.
+3. Apply migrations
    ```bash
-   npx wrangler d1 migrations apply iot_dashboard_db --remote
+   npx wrangler d1 migrations apply eee4464 --remote
    ```
-   (Use `--local` instead of `--remote` for local development if you have a local D1 setup).
-4. Deploy the project!
+4. Run locally
+   ```bash
+   npx wrangler dev
+   ```
+5. Deploy
    ```bash
    npx wrangler deploy
-Be mindful of potential rate limiting on your Worker and secure the API (e.g. with authentication) before exposing it publicly.
    ```
-## Local Development
-To run this project locally, you can use the `wrangler dev` command:
 
+## Usage
+The API responds with JSON. Example: posting a sensor reading
 ```bash
-npx wrangler dev
+curl -X POST https://<your-worker>/api/sensor_data \
+  -H 'Content-Type: application/json' \
+  -d '{"device_id": "123", "sensor_type": "temperature", "value": 25.2}'
 ```
-or
-```bash
-wrangler dev --remote
-```
-This will start a local server that simulates the Worker environment, allowing you to test your Worker and D1 database interactions.
+The front end is served at the Worker root URL and connects to these APIs.
+
+## Screenshots / Examples
+Plots generated from example data can be found in [`data/plots`](data/plots).
+
+## FAQ
+- **Where are the database tables defined?**  
+  Migration files in [`migrations/`](migrations/) create the tables.
+- **Why do I get `401` when calling an API?**  
+  Ensure you have logged in and included the session token in your request headers.
+
 ## License
-This project is licensed under the [MIT License](lICENSE).
-## \ud83d\udcda API Reference
-For full API details see [API_REFERENCE.md](API_REFERENCE.md).
+This project is licensed under the [MIT License](LICENSE).
+
+## Contact
+Author: Terry He & Karen  
+Email: <230263367@stu.vtc.edu.hk.com>
+
+For detailed API endpoints see [API_REFERENCE.md](API_REFERENCE.md).
