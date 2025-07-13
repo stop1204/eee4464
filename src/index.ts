@@ -75,8 +75,8 @@ async function handleAddDeviceToUser(request: Request, db: D1Database) {
     }
     
     // Validate device_id format (numeric 3-20 characters)
-    if (!/^\d{3,20}$/.test(device_id.toString())) {
-      return json({ success: false, message: 'Device ID must be 3-20 digits' }, 400);
+    if (!/^\d{1,20}$/.test(device_id.toString())) {
+      return json({ success: false, message: 'Device ID must be 1-20 digits' }, 400);
     }
     
     // Check if user exists
