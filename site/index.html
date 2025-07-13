@@ -366,9 +366,9 @@
             <div style="margin-top:20px; border-top:1px solid #ddd; padding-top:15px;">
                 <h3>Manage Device IDs</h3>
                 <div style="margin-bottom:10px;">
-                    <input type="text" id="deviceIdInput" placeholder="Device ID (3-20 digits)" 
+                    <input type="text" id="deviceIdInput" placeholder="Device ID (1-20 digits)" 
                            style="padding:8px; border-radius:4px; width:200px; margin-right:10px;"
-                           pattern="[0-9]{3,20}" title="Enter 3-20 digits only">
+                           pattern="[0-9]{1,20}" title="Enter 1-20 digits only">
                     <br/>
                     <br/>
                     <button id="btnAddDeviceToUser" style="background-color:#28a745; color:white; padding:8px 15px; border:none; border-radius:4px; cursor:pointer; margin-right:10px;">Add to Account</button>
@@ -1693,8 +1693,8 @@
             const deviceId = deviceIdInput.value.trim();
             
             // Input validation
-            if (!deviceId || deviceId.length < 3 || deviceId.length > 20 || !/^\d+$/.test(deviceId)) {
-                deviceManagementResult.textContent = 'Please enter a valid device ID (3-20 digits)';
+            if (!deviceId || deviceId.length < 1 || deviceId.length > 20 || !/^\d+$/.test(deviceId)) {
+                deviceManagementResult.textContent = 'Please enter a valid device ID (1-20 digits)';
                 deviceManagementResult.style.color = '#dc3545';
                 return;
             }
