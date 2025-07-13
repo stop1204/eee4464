@@ -76,3 +76,5 @@ Author: Terry He & Karen
 Email: <230263367@stu.vtc.edu.hk>
 
 For detailed API endpoints see [API_REFERENCE.md](API_REFERENCE.md).
+
+For detailed visual guide with images and instructions see [Setup](/docs/Project%20Setup%20Guide%20for%20Cloudflare%20Workers%20and%20D1%20Database.docx).
