@@ -40,13 +40,13 @@ A lightweight IoT platform built with **Cloudflare Workers** and **D1**. It prov
 3. Apply migrations
    ```bash
    # npx wrangler d1 migrations apply eee4464 --remote
-   npx wrangler d1 execute eee4464 --file=./migrations/0001_create_comments_table.sql --remote
-   npx wrangler d1 execute eee4464 --file=./migrations/0002_create_device_table.sql --remote
-   npx wrangler d1 execute eee4464 --file=./migrations/0003_create_sensors_table.sql --remote
-   npx wrangler d1 execute eee4464 --file=./migrations/0004_create_sensor_data_table.sql --remote
-   npx wrangler d1 execute eee4464 --file=./migrations/0005_create_controls_table.sql --remote
-   npx wrangler d1 execute eee4464 --file=./migrations/0006_create_message_table.sql --remote
-   npx wrangler d1 execute eee4464 --file=./migrations/users.sql --remote
+   npx wrangler d1 execute eee4464 --file=./migrations/0001_create_comments_table.sql 
+   npx wrangler d1 execute eee4464 --file=./migrations/0002_create_device_table.sql 
+   npx wrangler d1 execute eee4464 --file=./migrations/0003_create_sensors_table.sql 
+   npx wrangler d1 execute eee4464 --file=./migrations/0004_create_sensor_data_table.sql 
+   npx wrangler d1 execute eee4464 --file=./migrations/0005_create_controls_table.sql 
+   npx wrangler d1 execute eee4464 --file=./migrations/0006_create_message_table.sql 
+   npx wrangler d1 execute eee4464 --file=./migrations/users.sql 
    ```
 4. Run locally
    ```bash
